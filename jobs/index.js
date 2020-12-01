@@ -34,6 +34,10 @@ const jobs = [
     name: 'check-unknown-payment-methods',
     interval: '1h',
     timeout: 0
+  },
+  {
+    name: 'potential-abuse',
+    interval: '15m'
   }
 ];
 

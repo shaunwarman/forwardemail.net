@@ -1,0 +1,19 @@
+
+extends ../layout
+
+block content
+  .container.mt-3
+    .row
+      .col-12
+        .card.d-block
+          h5.card-header.text-center= t('Potential Abuse')
+          .card-body
+            .card-text
+              p= t('Potential alias abuse:')
+              ul
+                each userAlias in aliasAbuseList
+                  li= t(`Email ${userAlias.email} - count: ${userAlias.count}`)
+              p= t('Potential domain abuse:')
+              ul
+                each userDomain in domainAbuseList
+                  li= t(`Email ${userDomain.email} - count: ${userDomain.count}`)
