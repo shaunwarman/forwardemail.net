@@ -4,10 +4,13 @@
  */
 
 const Boom = require('@hapi/boom');
+const config = require('#config');
 
 async function enforcePaidPlan(ctx, next) {
   if (!ctx.isAuthenticated())
     return ctx.throw(Boom.unauthorized(ctx.translateError('LOGIN_REQUIRED')));
+
+  if (config.isSelfHosted) return next();
 
   if (ctx.state.user.plan === 'free')
     return ctx.throw(

@@ -76,6 +76,8 @@ deployment-keys
 *.key
 *.ca-bundle
 *.crt
+.env.docker
+.env.selfhosted
 .env.test
 .gapp-creds.json
 

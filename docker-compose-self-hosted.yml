@@ -1,0 +1,204 @@
+version: '3.8'
+
+# some inspiration
+# https://supabase.com/docs/guides/self-hosting/docker
+# https://github.com/supabase/supabase/blob/master/docker/docker-compose.yml
+# https://docs.plane.so/self-hosting/docker-compose
+
+# local domain verification
+# 1. create shaunwarman.com locally and verify via txt record
+# db.domains.updateOne({ name: 'shaunwarman.com' }, { $set: { verification_record: 'P5KF3HLKod' } });
+
+# 2. upgrade domain
+# db.domains.updateOne({ name: 'shaunwarman.com' }, { $set: { plan: 'team' } })
+
+# 3. configure email auth
+# configure dkim / return-path / dmarc
+# error: Domain name shaunwarman.com must have at least one admin that is signed up for the Team plan. Please upgrade your domain to this plan to continue.
+# has_dkim_record, has_dmarc_record, has_return_path_record, has_recipient_verification, has_custom_verification
+# db.domains.updateOne({ name: 'shaunwarman.com' }, { $set: { has_custom_verification: true, has_recipient_verification: true, has_return_path_record: true, has_dmarc_record: true, has_dkim_record: true }})
+
+# 4. setup password
+# http://localhost:3000/en/my-account/domains/shaunwarman.com/catch-all-passwords
+# error: Domain name shaunwarman.com must have at least one admin that is signed up for the Team plan. Please upgrade your domain to this plan to continue.
+# 402 payment required
+# db.users.updateOne({ email: 'test-local@shaunwarman.com' }, { $set: { plan: 'team', group: 'admin' }})
+
+# QUESTIONS
+#
+#
+#
+#
+#
+#
+#
+
+# self hosted features
+## smtp
+## imap
+## web?
+## api?
+## pop3
+## storage?
+
+# Experience
+# install deps
+# curl docker compose
+# setup .env ???? how to make this easier
+# docker-compose up -d
+# setup networking?
+# signup at <your-ip>:<port>
+# configure email client?
+
+# dev features
+# everything local
+# mock domain name creation
+# send and receive email from locally configured email client
+
+
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    command: ["node", "web.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  api:
+    build: .
+    ports:
+      - "4000:4000"
+    command: ["node", "api.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+  
+  bree:
+    build: .
+    command: ["node", "bree.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  imap:
+    build: .
+    ports:
+      - "993:993"
+      - "2113:2113"
+    command: ["node", "imap.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  pop3:
+    build: .
+    ports:
+      - "995:995"
+      - "2115:2115"
+    command: ["node", "pop3.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  smtp:
+    build: .
+    ports:
+      - "2432:2432"
+    command: ["node", "smtp.js"]
+    env_file:
+      - .env.docker
+    environment:
+      - SMTP_ALLOW_INSECURE_AUTH=true
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  smtp_bree:
+    build: .
+    command: ["node", "smtp-bree.js"]
+    env_file:
+      - .env.docker
+    environment:
+      - SMTP_ALLOW_INSECURE_AUTH=true
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    env_file:
+      - .env.docker
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+    - redis-data:/data
+    env_file:
+      - .env.docker
+
+  # sqlite data container (is this necessary or 
+  # should sqlite proxy container have sqlite running
+  sqlite_data:
+    image: nouchka/sqlite3
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+
+  sqlite:
+    build: .
+    ports:
+      - "3456:3456"
+    command: ["node", "sqlite.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  sqlite_bree:
+    build: .
+    command: ["node", "sqlite-bree.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+volumes:
+  mongodb-data:
+  redis-data:
+  sqlite-data:

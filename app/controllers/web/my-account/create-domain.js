@@ -9,6 +9,7 @@ const { boolean } = require('boolean');
 
 const toObject = require('#helpers/to-object');
 const { Users, Domains, Aliases } = require('#models');
+const config = require('#config');
 
 async function createDomain(ctx, next) {
   try {
@@ -19,7 +20,7 @@ async function createDomain(ctx, next) {
       is_global:
         ctx.state.user.group === 'admin' && boolean(ctx.request.body.is_global),
       locale: ctx.locale,
-      plan: ctx.request.body.plan,
+      plan: config.isSelfHosted ? 'team' : ctx.request.body.plan, // TODO: if self hosted make this teams?
       resolver: ctx.resolver,
       ...ctx.state.optionalBooleans
     });

@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+
+  # run the below command to along side this
+  # to get web hot reloading enabled for faster 
+  # iteration but do note that mongo / redis will 
+  # potentially need clean data on restarts
+  # npm start webAndWatch
+
+  api:
+    build: .
+    ports:
+      - "4000:4000"
+    command: ["node", "api.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+  
+  bree:
+    build: .
+    command: ["node", "bree.js"]
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  imap:
+    build: .
+    ports:
+      - "993:993"
+      - "2113:2113"
+    command: ["node", "imap.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  pop3:
+    build: .
+    ports:
+      - "995:995"
+      - "2115:2115"
+    command: ["node", "pop3.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  smtp:
+    build: .
+    ports:
+      - "2432:2432"
+    command: ["node", "smtp.js"]
+    env_file:
+      - .env.docker
+    environment:
+      - SMTP_ALLOW_INSECURE_AUTH=true
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  smtp_bree:
+    build: .
+    command: ["node", "smtp-bree.js"]
+    env_file:
+      - .env.docker
+    environment:
+      - SMTP_ALLOW_INSECURE_AUTH=true
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    env_file:
+      - .env.docker
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+    - redis-data:/data
+    env_file:
+      - .env.docker
+
+  # sqlite data container (is this necessary or 
+  # should sqlite proxy container have sqlite running
+  sqlite_data:
+    image: nouchka/sqlite3
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+
+  sqlite:
+    build: .
+    ports:
+      - "3456:3456"
+    command: ["node", "sqlite.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+  sqlite_bree:
+    build: .
+    command: ["node", "sqlite-bree.js"]
+    volumes:
+      - sqlite-data:${SQLITE_TMPDIR}
+    env_file:
+      - .env.docker
+    depends_on:
+      - mongodb
+      - redis
+      - sqlite_data
+
+volumes:
+  mongodb-data:
+  redis-data:
+  sqlite-data:

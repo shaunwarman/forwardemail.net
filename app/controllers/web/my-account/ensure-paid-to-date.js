@@ -11,8 +11,11 @@ const isSANB = require('is-string-and-not-blank');
 const emailHelper = require('#helpers/email');
 const config = require('#config');
 
-// eslint-disable-next-line complexity
 async function ensurePaidToDate(ctx, next) {
+  // short-circuit if in self-hosted mode
+  // as we don't need to check payment
+  if (config.isSelfHosted) return next();
+
   // if the user has a global domain and they're not an admin
   // and they are not on a paid plan or their plan is 30d past due
   // then alert them with a toast notification

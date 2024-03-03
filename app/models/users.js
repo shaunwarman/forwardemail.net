@@ -425,6 +425,13 @@ Users.pre('validate', async function (next) {
 // Plan expires at should get updated everytime the user is saved
 Users.pre('save', async function (next) {
   const user = this;
+
+  // If self-hosted, then always set to a date in the future
+  if (config.isSelfHosted) {
+    user[config.userFields.planExpiresAt] = dayjs().add(50, 'year').toDate();
+    return next();
+  }
+
   // If user is on the free plan then return early
   if (user.plan === 'free') {
     user[config.userFields.planExpiresAt] = new Date(

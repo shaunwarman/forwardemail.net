@@ -334,7 +334,10 @@ async function register(ctx, next) {
 
   if (config.env === 'development') {
     const count = await Users.countDocuments({ group: 'admin' });
-    if (count === 0) query.group = 'admin';
+    if (count === 0) {
+      query.group = 'admin';
+      query.plan = 'team';
+    }
   }
 
   query[config.userFields.hasVerifiedEmail] = false;

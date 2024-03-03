@@ -36,7 +36,7 @@ async function sendEmail({
   //
   // if we're in development mode then use preview-email to render queue processing
   //
-  if (config.env === 'development') {
+  if (config.env === 'development' && !config.isSelfHosted) {
     await previewEmail(raw, {
       ...config.previewEmailOptions,
       returnHTML: false

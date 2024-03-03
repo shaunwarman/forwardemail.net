@@ -177,6 +177,7 @@ const config = {
   dkimKeySelector: 'forwardemail', // forwardemail._domainkey.example.com
   supportRequestMaxLength: env.SUPPORT_REQUEST_MAX_LENGTH,
   abuseEmail: env.EMAIL_ABUSE,
+  isSelfHosted: env.IS_SELF_HOSTED,
   email: {
     preview: {
       open: env.PREVIEW_EMAIL,
