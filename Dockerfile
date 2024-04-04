@@ -1,21 +1,18 @@
-# Use an official Node.js runtime as a parent image
-FROM node:20
+FROM node:latest AS builder
 
-# Set the working directory in the container
-WORKDIR /usr/src/app
-
-# create cert / key / ca and dhparam
-# set the path as WEB_SSL_* env vars
+WORKDIR /app
 
 RUN npm install -g pnpm
 
-# Copy package.json and package-lock.json (or yarn.lock) into the working directory
-COPY package*.json ./
-
-# Install any needed packages specified in package*.json
-RUN pnpm i
-
-# Copy the rest of your application's code into the working directory
 COPY . .
 
-RUN npm run build
+RUN pnpm i && npm run build
+
+## build everything in the first stage and then
+## leverage .dockerignore and 2nd stage to remove files
+## from the built image that we don't want included
+FROM node:slim
+
+WORKDIR /app
+
+COPY --from=builder /app /app

@@ -82,6 +82,19 @@ docker-compose -f docker-compose-self-hosted.yml up -d
 - development mode will only send preview emails, we need to get production env to work
 - redis-cli KEYS "auth_limit*" | xargs redis-cli DEL
   - because imap died with wildduck SNI issue and then login fails
+- https://www.digitalocean.com/community/questions/npm-gets-killed-no-matter-what
+- Build image once and re-use for all docker-compose
+- .dockerignore .env* and force add that from host
+- add CLI to configure application
+- how much can we remove from .env
+- build new image without any .env
+
+
+#### VM setup
+- VERSION=$(curl --silent https://api.github.com/repos/docker/compose/releases/latest | jq .name -r)
+- DESTINATION=/usr/local/bin/docker-compose
+- sudo curl -L https://github.com/docker/compose/releases/download/$-{VERSION}/docker-compose-$(uname -s)-$(uname -m) -o $DESTINATION
+- sudo chmod 755 $DESTINATION
 
 
 ### Inspiration

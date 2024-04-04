@@ -55,10 +55,15 @@ version: '3.8'
 # mock domain name creation
 # send and receive email from locally configured email client
 
+# useful docker commands:
+# - systemctl status docker
+# - 
+
 
 services:
   web:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: web
     ports:
       - "3000:3000"
     command: ["node", "web.js"]
@@ -70,7 +75,8 @@ services:
       - sqlite_data
 
   api:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: api
     ports:
       - "4000:4000"
     command: ["node", "api.js"]
@@ -82,7 +88,8 @@ services:
       - sqlite_data
   
   bree:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: bree
     command: ["node", "bree.js"]
     env_file:
       - .env.docker
@@ -92,7 +99,8 @@ services:
       - sqlite_data
 
   imap:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: imap
     ports:
       - "993:993"
       - "2113:2113"
@@ -107,7 +115,8 @@ services:
       - sqlite_data
 
   pop3:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: pop3
     ports:
       - "995:995"
       - "2115:2115"
@@ -122,7 +131,8 @@ services:
       - sqlite_data
 
   smtp:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: smtp
     ports:
       - "2432:2432"
     command: ["node", "smtp.js"]
@@ -136,12 +146,11 @@ services:
       - sqlite_data
 
   smtp_bree:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: smtp_bree
     command: ["node", "smtp-bree.js"]
     env_file:
       - .env.docker
-    environment:
-      - SMTP_ALLOW_INSECURE_AUTH=true
     depends_on:
       - mongodb
       - redis
@@ -173,7 +182,8 @@ services:
       - sqlite-data:${SQLITE_TMPDIR}
 
   sqlite:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: sqlite
     ports:
       - "3456:3456"
     command: ["node", "sqlite.js"]
@@ -187,7 +197,8 @@ services:
       - sqlite_data
 
   sqlite_bree:
-    build: .
+    image: shaunw321/fe-local-slim
+    container_name: sqlite_bree
     command: ["node", "sqlite-bree.js"]
     volumes:
       - sqlite-data:${SQLITE_TMPDIR}
