@@ -21,11 +21,7 @@ function encrypt(
   algorithm = 'aes-256-cbc'
 ) {
   if (!text) throw new TypeError(`Text value missing`);
-  const iv = ivLength
-    ? Buffer.from(crypto.randomBytes(ivLength))
-        .toString('hex')
-        .slice(0, ivLength)
-    : null;
+  const iv = Buffer.from(crypto.randomBytes(ivLength));
   const cipher = crypto.createCipheriv(
     algorithm,
     Buffer.from(encryptionKey),
@@ -44,16 +40,25 @@ function decrypt(
 ) {
   if (!text) throw new TypeError(`Text value missing`);
   try {
-    const textParts = text.includes('-') ? text.split('-') : [];
-    const iv = Buffer.from(textParts.shift() || '', 'binary');
-    const encryptedText = Buffer.from(textParts.join('-'), 'hex');
+    let iv;
+    let encryptedText;
+
+    if (text.includes('-')) {
+      const parts = text.split('-');
+      iv = Buffer.from(parts[0], 'hex');
+      encryptedText = Buffer.from(parts[1], 'hex');
+    } else {
+      iv = text.slice(0, 16);
+      encryptedText = Buffer.from(text.slice(16), 'hex');
+    }
+
     const decipher = crypto.createDecipheriv(
       algorithm,
       Buffer.from(encryptionKey),
       iv
     );
-    let decrypted = decipher.update(encryptedText);
 
+    let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
   } catch {
