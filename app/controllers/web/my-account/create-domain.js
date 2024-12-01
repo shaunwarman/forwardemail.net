@@ -19,7 +19,7 @@ async function createDomain(ctx, next) {
   ) {
     const names = await Domains.distinct('name', {
       'members.user': ctx.state.user._id,
-      plan: 'free',
+      plan: config.isSelfHosted ? 'team' : ctx.request.body.plan,
       is_global: false
     });
 
@@ -67,6 +67,7 @@ async function createDomain(ctx, next) {
       locale: ctx.locale,
       plan: ctx.request.body.plan,
       resolver: ctx.resolver,
+      has_smtp: Boolean(config.isSelfHosted),
       ...ctx.state.optionalBooleans
     });
 
