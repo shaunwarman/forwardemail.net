@@ -10,7 +10,7 @@ const { boolean } = require('boolean');
 
 // const config = require('#config');
 
-const jobs = [
+let jobs = [
   // 'migration',
   'vanity-domains',
   // NOTE: we had to combine paypal sync jobs together because of API 429 rate limiting
@@ -261,5 +261,73 @@ if (boolean(process.env.CACHE_RESPONSES))
     interval: '1h',
     timeout: 0
   });
+
+if (boolean(process.env.SELF_HOSTED)) {
+  jobs = [
+    {
+      name: 'bounce-report',
+      interval: '4h',
+      timeout: '1h'
+    },
+    {
+      name: 'check-domains',
+      interval: '1h',
+      timeout: '1h'
+    },
+    {
+      name: 'check-scheduled-send',
+      interval: '5m',
+      timeout: '5m'
+    },
+    {
+      name: 'check-smtp',
+      interval: '1h',
+      timeout: '5m'
+    },
+    {
+      name: 'check-smtp-frozen-queue',
+      interval: '15s',
+      timeout: '5m'
+    },
+    {
+      name: 'check-smtp-queue-count',
+      interval: '5m',
+      timeout: '1m'
+    },
+    {
+      name: 'parse-logs',
+      interval: '5m',
+      timeout: '1m'
+    },
+    {
+      name: 'update-uceprotect',
+      interval: '1h',
+      timeout: '5m'
+    },
+    {
+      name: 'update-umbrella',
+      interval: '1d',
+      timeout: '5m'
+    }
+  ];
+}
+
+if (boolean(process.env.MONGO_S3_BACKUPS_ENABLED)) {
+  jobs.push({
+    name: 'backup-mongo',
+    interval: '10m',
+    timeout: '5m',
+    path: path.join(__dirname, 'backups', 'backup-mongo.js')
+  });
+}
+
+if (boolean(process.env.REDIS_S3_BACKUPS_ENABLED)) {
+  jobs.push({
+    name: 'backup-redis',
+    interval: '10m',
+    timeout: '5m',
+    path: path.join(__dirname, 'backups', 'backup-redis.js')
+  });
+}
 
 module.exports = jobs;

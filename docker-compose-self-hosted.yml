@@ -1,0 +1,305 @@
+version: '3.8'
+services:
+  web:
+    image: self-hosted/forwardemail.net
+    container_name: web
+    ports:
+      - "443:443"
+    command: ["node", "web.js"]
+    volumes:
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    healthcheck:
+      test: "curl -ksL -o /dev/null https://127.0.0.1"
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      smtp:
+        condition: service_healthy
+
+  api:
+    image: self-hosted/forwardemail.net
+    container_name: api
+    ports:
+      - "4000:4000"
+    command: ["node", "api.js"]
+    volumes:
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    networks:
+      default:
+        aliases:
+          - api.${DOMAIN}
+    healthcheck:
+      test: "curl -ksL -o /dev/null https://127.0.0.1:4000/v1/test"
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      smtp:
+        condition: service_healthy
+
+  bree:
+    image: self-hosted/forwardemail.net
+    container_name: bree
+    command: ["node", "bree.js"]
+    volumes:
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  # https://forwardemail.net/en/faq#what-are-your-imap-server-configuration-settings
+  imap:
+    image: self-hosted/forwardemail.net
+    container_name: imap
+    ports:
+      - "993:993"
+      - "2993:2993"
+    command: ["node", "imap.js"]
+    volumes:
+      - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    networks:
+      default:
+        aliases:
+          - imap.${DOMAIN}
+    healthcheck:
+      test: "nc -z 127.0.0.1 993"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      sqlite:
+        condition: service_healthy
+
+  # https://forwardemail.net/en/faq#do-you-support-pop3
+  pop3:
+    image: self-hosted/forwardemail.net
+    container_name: pop3
+    ports:
+      - "995:995"
+      - "2995:2995"
+    command: ["node", "pop3.js"]
+    volumes:
+      - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    networks:
+      default:
+        aliases:
+          - pop3.${DOMAIN}
+    healthcheck:
+      test: "nc -z 127.0.0.1 995"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      sqlite:
+        condition: service_healthy
+
+  # https://forwardemail.net/en/faq#what-are-your-smtp-server-configuration-settings
+  smtp:
+    image: self-hosted/forwardemail.net
+    container_name: smtp
+    ports:
+      - "465:465" # SSL / TLS
+      - "587:587" # startTLS
+    command: ["node", "smtp.js"]
+    volumes:
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    networks:
+      default:
+        aliases:
+          - smtp.${DOMAIN}
+    healthcheck:
+      test: "nc -z 127.0.0.1 465"
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  smtp_bree:
+    image: self-hosted/forwardemail.net
+    container_name: smtp_bree
+    hostname: ${DOMAIN}
+    command: ["node", "smtp-bree.js"]
+    volumes:
+      - ./.env:/app/.env
+      - ./ssl:/app/ssl/
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      smtp:
+        condition: service_healthy
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    volumes:
+      - mongo-data:/data/db
+      - ./mongo-backups:/backups
+    networks:
+      default:
+        aliases:
+          - mongodb.${DOMAIN}
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    volumes:
+      - ./redis-data:/data
+    networks:
+      default:
+        aliases:
+          - redis.${DOMAIN}
+    env_file:
+      - .env
+
+  sqlite:
+    image: self-hosted/forwardemail.net
+    container_name: sqlite
+    ports:
+      - "3456:3456"
+    command: ["node", "sqlite.js"]
+    volumes:
+      - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
+      - ./ssl:/app/ssl/
+      - ./.env:/app/.env
+    networks:
+      default:
+        aliases:
+          - sqlite.${DOMAIN}
+    healthcheck:
+      test: "nc -z 127.0.0.1 3456"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      smtp:
+        condition: service_healthy
+
+  sqlite_bree:
+    image: self-hosted/forwardemail.net
+    container_name: sqlite_bree
+    command: ["node", "sqlite-bree.js"]
+    volumes:
+      - ./ssl:/app/ssl/
+      - /mnt/${SQLITE_STORAGE_PATH}:/mnt/${SQLITE_STORAGE_PATH}
+      - ./.env:/app/.env
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      sqlite:
+        condition: service_healthy
+
+  mx:
+    image: self-hosted/forwardemail.net
+    container_name: mx
+    ports:
+      - "25:25"
+    command: ["node", "mx.js"]
+    volumes:
+      - ./ssl:/app/ssl/
+      - /mnt/${SQLITE_STORAGE_PATH}:/mnt/${SQLITE_STORAGE_PATH}
+      - ./.env:/app/.env
+    networks:
+      default:
+        aliases:
+          - mx.${DOMAIN}
+    healthcheck:
+      test: "nc -z 127.0.0.1 25"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      sqlite:
+        condition: service_healthy
+
+  caldav:
+    image: self-hosted/forwardemail.net
+    container_name: caldav
+    ports:
+      - "5000:5000"
+    command: ["node", "caldav.js"]
+    volumes:
+      - ./.env:/app/.env
+      - ./ssl:/app/ssl/
+    networks:
+      default:
+        aliases:
+          - caldav.${DOMAIN}
+    healthcheck:
+      test: "nc -z 127.0.0.1 5000"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      sqlite:
+        condition: service_healthy
+
+  # certbot:
+  #   image: certbot/certbot
+  #   container_name: certbot
+  #   volumes:
+  #     - certs:/etc/letsencrypt
+  #     - certbot-logs:/var/log/letsencrypt
+  #   entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 6h & wait $!; certbot renew; done;'"
+
+volumes:
+  mongo-data:
+  redis-data:
+  # certs:
+  # certbot-logs:
