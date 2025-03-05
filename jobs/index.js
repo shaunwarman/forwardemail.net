@@ -286,13 +286,13 @@ if (boolean(process.env.SELF_HOSTED)) {
     },
     {
       name: 'check-smtp-frozen-queue',
-      interval: '15s',
+      interval: '1m',
       timeout: '5m'
     },
     {
       name: 'check-smtp-queue-count',
-      interval: '5m',
-      timeout: '1m'
+      interval: '10m',
+      timeout: '10m'
     },
     {
       name: 'parse-logs',
@@ -307,27 +307,9 @@ if (boolean(process.env.SELF_HOSTED)) {
     {
       name: 'update-umbrella',
       interval: '1d',
-      timeout: '5m'
+      timeout: '10m'
     }
   ];
-}
-
-if (boolean(process.env.MONGO_S3_BACKUPS_ENABLED)) {
-  jobs.push({
-    name: 'backup-mongo',
-    interval: '10m',
-    timeout: '5m',
-    path: path.join(__dirname, 'backups', 'backup-mongo.js')
-  });
-}
-
-if (boolean(process.env.REDIS_S3_BACKUPS_ENABLED)) {
-  jobs.push({
-    name: 'backup-redis',
-    interval: '10m',
-    timeout: '5m',
-    path: path.join(__dirname, 'backups', 'backup-redis.js')
-  });
 }
 
 module.exports = jobs;

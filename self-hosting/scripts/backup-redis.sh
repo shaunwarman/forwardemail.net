@@ -17,8 +17,8 @@ AWS_S3_ENDPOINT="https://xxx.r2.cloudflarestorage.com"
 
 # NOTE: restore
 # aws s3 cp s3://forwardemail-selfhosted/redis-backups/redis-YYYY-MM-DD_HH-MM.rdb /tmp/dump.rdb --profile cloudflare --endpoint-url $AWS_S3_ENDPOINT
-# tar -xzf /tmp/mongo-backup.tgz -C /tmp
-# docker exec -i mongodb mongorestore --drop --dir "/tmp/mongo-backup-YYYY-MM-DD_HH-MM"
+# mv /tmp/dump.rdb $HOME/forwardemail.net/redis-data/dump.rdb
+# restart services
 
 
 echo "Triggering Redis backup..."

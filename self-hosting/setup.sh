@@ -142,6 +142,7 @@ check_docker_running() {
     echo "❌ Docker is not running. Attempting to start it."
     systemctl unmask docker
     systemctl enable docker
+    systemctl start docker
     if ! docker info >/dev/null 2>&1; then
       echo "Docker issues with systemctl, using dockerd directly..."
       nohup dockerd > /dev/null 2>/dev/null &
@@ -195,6 +196,7 @@ update_default_env() {
   update_env_file HTTP_PROTOCOL https
   update_env_file SQLITE_HOST sqlite.{{DOMAIN}}
   update_env_file WEB_HOST {{DOMAIN}}
+  update_env_file WEB_PORT 443
   update_env_file CALDAV_HOST caldav.{{DOMAIN}}
   update_env_file API_HOST api.{{DOMAIN}}
   update_env_file APP_NAME {{DOMAIN}}
@@ -208,6 +210,7 @@ update_default_env() {
   update_env_file REDIS_HOST redis.{{DOMAIN}}
   update_env_file TURNSTILE_ENABLED false
   update_env_file MX_PORT 25
+  update_env_file SQLITE_STORAGE_PATH sqlite_storage
   update_env_file SMTP_TRANSPORT_PASS "Thisisapassword123"
   update_env_file SMTP_HOST smtp.{{DOMAIN}}
   update_env_file SMTP_PORT 465
@@ -312,6 +315,14 @@ clone_repo() {
   fi
 }
 
+# this is used for spf so outgoing smtp email have the true client IP
+ip_mask() {
+  sysctl -w net.ipv4.ip_forward=1
+  SUBNET=$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
+  iptables -t nat -A POSTROUTING -s $SUBNET ! -o docker0 -j MASQUERADE
+  # iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+}
+
 create_db_directories() {
   mkdir -p "$ROOT_DIR/$SQLITE_DB_DIR"
   mkdir -p "$ROOT_DIR/$MONGODB_DB_BACKUPS_DIR"
@@ -384,14 +395,14 @@ initial_setup() {
 
   create_db_directories
 
+  # take down any previous setup
+  docker-compose -f docker-compose-self-hosted.yml down
+
   echo "Building re-usable docker image..."
   docker builder build -t self-hosted/forwardemail.net:latest .
 
   openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
   update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
-
-  # take down any previous setup
-  docker-compose -f docker-compose-self-hosted.yml down
 
   echo "Spinning up necessary infrastructure..."
   sudo docker-compose -f docker-compose-self-hosted.yml up -d
