@@ -3,8 +3,7 @@ services:
   web:
     image: self-hosted/forwardemail.net
     container_name: web
-    ports:
-      - "443:443"
+    network_mode: host
     command: ["node", "web.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -26,16 +25,11 @@ services:
   api:
     image: self-hosted/forwardemail.net
     container_name: api
-    ports:
-      - "4000:4000"
+    network_mode: host
     command: ["node", "api.js"]
     volumes:
       - ./ssl:/app/ssl/
       - ./.env:/app/.env
-    networks:
-      default:
-        aliases:
-          - api.${DOMAIN}
     healthcheck:
       test: "curl -ksL -o /dev/null https://127.0.0.1:4000/v1/test"
       interval: 10s
@@ -53,6 +47,7 @@ services:
   bree:
     image: self-hosted/forwardemail.net
     container_name: bree
+    network_mode: host
     command: ["node", "bree.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -67,18 +62,12 @@ services:
   imap:
     image: self-hosted/forwardemail.net
     container_name: imap
-    ports:
-      - "993:993"
-      - "2993:2993"
+    network_mode: host
     command: ["node", "imap.js"]
     volumes:
       - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
       - ./ssl:/app/ssl/
       - ./.env:/app/.env
-    networks:
-      default:
-        aliases:
-          - imap.${DOMAIN}
     healthcheck:
       test: "nc -z 127.0.0.1 993"
       interval: 10s
@@ -97,18 +86,12 @@ services:
   pop3:
     image: self-hosted/forwardemail.net
     container_name: pop3
-    ports:
-      - "995:995"
-      - "2995:2995"
+    network_mode: host
     command: ["node", "pop3.js"]
     volumes:
       - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
       - ./ssl:/app/ssl/
       - ./.env:/app/.env
-    networks:
-      default:
-        aliases:
-          - pop3.${DOMAIN}
     healthcheck:
       test: "nc -z 127.0.0.1 995"
       interval: 10s
@@ -127,17 +110,11 @@ services:
   smtp:
     image: self-hosted/forwardemail.net
     container_name: smtp
-    ports:
-      - "465:465" # SSL / TLS
-      - "587:587" # startTLS
+    network_mode: host
     command: ["node", "smtp.js"]
     volumes:
       - ./ssl:/app/ssl/
       - ./.env:/app/.env
-    networks:
-      default:
-        aliases:
-          - smtp.${DOMAIN}
     healthcheck:
       test: "nc -z 127.0.0.1 465"
       interval: 10s
@@ -153,7 +130,7 @@ services:
   smtp_bree:
     image: self-hosted/forwardemail.net
     container_name: smtp_bree
-    hostname: ${DOMAIN}
+    network_mode: host
     command: ["node", "smtp-bree.js"]
     volumes:
       - ./.env:/app/.env
@@ -170,40 +147,29 @@ services:
   mongodb:
     image: mongo:latest
     container_name: mongodb
+    network_mode: host
     volumes:
       - mongo-data:/data/db
       - ./mongo-backups:/backups
-    networks:
-      default:
-        aliases:
-          - mongodb.${DOMAIN}
 
   redis:
     image: redis:latest
     container_name: redis
+    network_mode: host
     volumes:
       - ./redis-data:/data
-    networks:
-      default:
-        aliases:
-          - redis.${DOMAIN}
     env_file:
       - .env
 
   sqlite:
     image: self-hosted/forwardemail.net
     container_name: sqlite
-    ports:
-      - "3456:3456"
+    network_mode: host
     command: ["node", "sqlite.js"]
     volumes:
       - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
       - ./ssl:/app/ssl/
       - ./.env:/app/.env
-    networks:
-      default:
-        aliases:
-          - sqlite.${DOMAIN}
     healthcheck:
       test: "nc -z 127.0.0.1 3456"
       interval: 10s
@@ -221,6 +187,7 @@ services:
   sqlite_bree:
     image: self-hosted/forwardemail.net
     container_name: sqlite_bree
+    network_mode: host
     command: ["node", "sqlite-bree.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -238,17 +205,12 @@ services:
   mx:
     image: self-hosted/forwardemail.net
     container_name: mx
-    ports:
-      - "25:25"
+    network_mode: host
     command: ["node", "mx.js"]
     volumes:
       - ./ssl:/app/ssl/
       - /mnt/${SQLITE_STORAGE_PATH}:/mnt/${SQLITE_STORAGE_PATH}
       - ./.env:/app/.env
-    networks:
-      default:
-        aliases:
-          - mx.${DOMAIN}
     healthcheck:
       test: "nc -z 127.0.0.1 25"
       interval: 10s
@@ -266,16 +228,11 @@ services:
   caldav:
     image: self-hosted/forwardemail.net
     container_name: caldav
-    ports:
-      - "5000:5000"
+    network_mode: host
     command: ["node", "caldav.js"]
     volumes:
       - ./.env:/app/.env
       - ./ssl:/app/ssl/
-    networks:
-      default:
-        aliases:
-          - caldav.${DOMAIN}
     healthcheck:
       test: "nc -z 127.0.0.1 5000"
       interval: 10s

@@ -194,31 +194,31 @@ update_env_file() {
 update_default_env() {
   update_env_file NODE_ENV production
   update_env_file HTTP_PROTOCOL https
-  update_env_file SQLITE_HOST sqlite.{{DOMAIN}}
+  update_env_file SQLITE_HOST 127.0.0.1
   update_env_file WEB_HOST {{DOMAIN}}
   update_env_file WEB_PORT 443
-  update_env_file CALDAV_HOST caldav.{{DOMAIN}}
-  update_env_file API_HOST api.{{DOMAIN}}
+  update_env_file CALDAV_HOST 127.0.0.1
+  update_env_file API_HOST 127.0.0.1
   update_env_file APP_NAME {{DOMAIN}}
   update_env_file TRANSPORT_DEBUG true
   update_env_file SEND_EMAIL true
   update_env_file PREVIEW_EMAIL false
-  update_env_file MONGO_HOST mongodb.{{DOMAIN}}
-  update_env_file LOGS_MONGO_HOST mongodb.{{DOMAIN}}
-  update_env_file JOURNALS_MONGO_HOST mongodb.{{DOMAIN}}
-  update_env_file EMAILS_MONGO_HOST mongodb.{{DOMAIN}}
-  update_env_file REDIS_HOST redis.{{DOMAIN}}
+  update_env_file MONGO_HOST 127.0.0.1
+  update_env_file LOGS_MONGO_HOST 127.0.0.1
+  update_env_file JOURNALS_MONGO_HOST 127.0.0.1
+  update_env_file EMAILS_MONGO_HOST 127.0.0.1
+  update_env_file REDIS_HOST 127.0.0.1
   update_env_file TURNSTILE_ENABLED false
   update_env_file MX_PORT 25
   update_env_file SQLITE_STORAGE_PATH sqlite_storage
   update_env_file SMTP_TRANSPORT_PASS "Thisisapassword123"
-  update_env_file SMTP_HOST smtp.{{DOMAIN}}
+  update_env_file SMTP_HOST 127.0.0.1
   update_env_file SMTP_PORT 465
-  update_env_file IMAP_HOST imap.{{DOMAIN}}
+  update_env_file IMAP_HOST 127.0.0.1
   update_env_file IMAP_PORT 993
-  update_env_file POP3_HOST pop3.{{DOMAIN}}
+  update_env_file POP3_HOST 127.0.0.1
   update_env_file POP3_PORT 995
-  update_env_file MX_HOST mx.{{DOMAIN}}
+  update_env_file MX_HOST 127.0.0.1
   update_env_file SMTP_EXCHANGE_DOMAINS mx.{{DOMAIN}}
   update_env_file SELF_HOSTED true
   update_env_file ENABLE_MONITOR_SERVER false
@@ -315,12 +315,15 @@ clone_repo() {
   fi
 }
 
-# this is used for spf so outgoing smtp email have the true client IP
-ip_mask() {
-  sysctl -w net.ipv4.ip_forward=1
-  SUBNET=$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}')
-  iptables -t nat -A POSTROUTING -s $SUBNET ! -o docker0 -j MASQUERADE
-  # iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+setup_firewall() {
+  ufw deny in on eth0 to any port 27017
+  ufw allow from 127.0.0.1 to any port 27017
+
+  ufw deny in on eth0 to any port 6379
+  ufw allow from 127.0.0.1 to any port 6379
+
+  ufw allow 22/tcp
+  ufw enable
 }
 
 create_db_directories() {
@@ -366,6 +369,7 @@ input_user_pass() {
 initial_setup() {
   update_dns_resolvers
   install_dependencies
+  setup_firewall
   clone_repo
 
   if [[ -f "$ENV_FILE" ]]; then
