@@ -316,14 +316,19 @@ clone_repo() {
 }
 
 setup_firewall() {
-  ufw deny in on eth0 to any port 27017
-  ufw allow from 127.0.0.1 to any port 27017
+  ufw default deny incoming > /dev/null 2>&1
 
-  ufw deny in on eth0 to any port 6379
-  ufw allow from 127.0.0.1 to any port 6379
+  PORTS=(22 25 80 443 465 587 993 995 2993 2995 3456 4000 5000)
 
-  ufw allow 22/tcp
-  ufw enable
+  for port in "${PORTS[@]}"; do
+    ufw allow "${port}/tcp" >/dev/null 2>&1
+  done
+  
+  ufw allow from 127.0.0.1 to any port 27017 > /dev/null 2>&1
+  ufw allow from 127.0.0.1 to any port 6379 > /dev/null 2>&1
+
+  ufw enable --force > /dev/null 2>&1
+  ufw status
 }
 
 create_db_directories() {
