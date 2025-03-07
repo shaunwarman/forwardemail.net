@@ -4,6 +4,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: web
     network_mode: host
+    hostname: ${DOMAIN}
     command: ["node", "web.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -26,6 +27,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: api
     network_mode: host
+    hostname: api.${DOMAIN}
     command: ["node", "api.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -63,6 +65,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: imap
     network_mode: host
+    hostname: imap.${DOMAIN}
     command: ["node", "imap.js"]
     volumes:
       - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
@@ -87,6 +90,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: pop3
     network_mode: host
+    hostname: pop3.${DOMAIN}
     command: ["node", "pop3.js"]
     volumes:
       - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
@@ -111,6 +115,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: smtp
     network_mode: host
+    hostname: smtp.${DOMAIN}
     command: ["node", "smtp.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -131,6 +136,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: smtp_bree
     network_mode: host
+    hostname: smtp.${DOMAIN}
     command: ["node", "smtp-bree.js"]
     volumes:
       - ./.env:/app/.env
@@ -165,6 +171,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: sqlite
     network_mode: host
+    hostname: sqlite.${DOMAIN}
     command: ["node", "sqlite.js"]
     volumes:
       - ./sqlite-data:/mnt/${SQLITE_STORAGE_PATH}
@@ -188,6 +195,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: sqlite_bree
     network_mode: host
+    hostname: sqlite.${DOMAIN}
     command: ["node", "sqlite-bree.js"]
     volumes:
       - ./ssl:/app/ssl/
@@ -207,6 +215,7 @@ services:
     container_name: mx
     network_mode: host
     command: ["node", "mx.js"]
+    hostname: mx.${DOMAIN}
     volumes:
       - ./ssl:/app/ssl/
       - /mnt/${SQLITE_STORAGE_PATH}:/mnt/${SQLITE_STORAGE_PATH}
@@ -229,6 +238,7 @@ services:
     image: self-hosted/forwardemail.net
     container_name: caldav
     network_mode: host
+    hostname: caldav.${DOMAIN}
     command: ["node", "caldav.js"]
     volumes:
       - ./.env:/app/.env

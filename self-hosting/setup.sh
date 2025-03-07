@@ -153,18 +153,15 @@ check_docker_running() {
 }
 
 update_dns_resolvers() {
-  DNS1="1.1.1.1"
-  DNS2="1.0.0.1"
-
-  echo "Updating system to use Cloudflare DNS ($DNS1, $DNS2)..."
+  echo "Updating system to use Cloudflare DNS"
 
   # lots of issues with local resolvers for some cloud providers, so use cloudflare by default
   # this directly affects certbot setup and acme-challenge txt record checks
+  echo "nameserver 1.1.1.1" | tee /etc/resolv.conf
   if systemctl is-active --quiet systemd-resolved; then
-      sudo sed -i "s/^#DNS=/DNS=1.1.1.1 1.0.0.1/" /etc/systemd/resolved.conf
-      sudo sed -i "s/^#FallbackDNS=/FallbackDNS=8.8.8.8 8.8.4.4/" /etc/systemd/resolved.conf
-      ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-      sudo systemctl restart systemd-resolved
+    systemctl stop systemd-resolved
+    systemctl disable systemd-resolved
+    systemctl mask systemd-resolved
   fi
 
   echo "DNS update complete!"
@@ -327,7 +324,7 @@ setup_firewall() {
   ufw allow from 127.0.0.1 to any port 27017 > /dev/null 2>&1
   ufw allow from 127.0.0.1 to any port 6379 > /dev/null 2>&1
 
-  ufw enable --force > /dev/null 2>&1
+  echo "y" | ufw enable > /dev/null 2>&1
   ufw status
 }
 
@@ -387,12 +384,11 @@ initial_setup() {
   check_docker_running
 
   input_custom_domain
+  remove_from_schema
+  update_default_env
   input_user_pass
   update_env_file "AUTH_BASIC_USERNAME" "$username"
   update_env_file "AUTH_BASIC_PASSWORD" "$password"
-
-  remove_from_schema
-  update_default_env
 
   generate_certificates
   generate_encryption_keys
