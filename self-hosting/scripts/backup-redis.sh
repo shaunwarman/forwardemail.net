@@ -8,15 +8,13 @@ BACKUP_FILE="redis-$TIMESTAMP.rdb"
 LOCAL_REDIS_DUMP="/data/dump.rdb"
 RETENTION_DAYS=7
 
-USE_S3=true
 S3_BUCKET="forwardemail-selfhosted"
 S3_PATH="s3://$S3_BUCKET/redis-backups/"
-AWS_S3_ENDPOINT="https://xxx.r2.cloudflarestorage.com"
 
 # */5 * * * * $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh >> /var/log/redis-backup.log 2>&1
 
 # NOTE: restore
-# aws s3 cp s3://forwardemail-selfhosted/redis-backups/redis-YYYY-MM-DD_HH-MM.rdb /tmp/dump.rdb --profile cloudflare --endpoint-url $AWS_S3_ENDPOINT
+# aws s3 cp s3://forwardemail-selfhosted/redis-backups/redis-YYYY-MM-DD_HH-MM.rdb /tmp/dump.rdb
 # mv /tmp/dump.rdb $HOME/forwardemail.net/redis-data/dump.rdb
 # restart services
 
@@ -45,16 +43,14 @@ else
 fi
 
 # Upload to AWS S3 (if enabled)
-if [[ "$USE_S3" == true ]]; then
-    echo "Uploading to S3..."
-    
-    aws s3api create-bucket --bucket "$S3_BUCKET" --endpoint-url "$AWS_S3_ENDPOINT" 2>/dev/null || true
-    if aws s3 cp "$BACKUP_DIR/$BACKUP_FILE" "$S3_PATH" --profile cloudflare --endpoint-url "$AWS_S3_ENDPOINT"; then
-        echo "Backup successfully uploaded to S3: $S3_PATH"
-    else
-        echo "Error uploading backup to S3." >&2
-        exit 1
-    fi
+echo "Uploading to S3..."
+
+aws s3api create-bucket --bucket "$S3_BUCKET" 2>/dev/null || true
+if aws s3 cp "$BACKUP_DIR/$BACKUP_FILE" "$S3_PATH"; then
+    echo "Backup successfully uploaded to S3: $S3_PATH"
+else
+    echo "Error uploading backup to S3." >&2
+    exit 1
 fi
 
 # Cleanup old backups

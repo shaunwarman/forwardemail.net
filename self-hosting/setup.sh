@@ -3,6 +3,12 @@
 # How to install
 # curl -sSL https://raw.githubusercontent.com/forwardemail.net/forwardemail.net/master/self-hosting/setup.sh | bash
 # curl -sSL https://raw.githubusercontent.com/shaunwarman/forwardemail.net/feat/self-hosted-mvp/self-hosting/setup.sh | bash
+# bash <(curl -fsSL setup.myselfhosted.email)
+
+# check for spam on the IP first
+# https://www.abuseipdb.com/check/<ip>
+# https://www.spamrats.com/lookup.php?ip=<ip>
+# https://check.spamhaus.org/results/?query=<ip>
 
 set -e          # Exit immediately if a command exits with a non-zero status
 set -o pipefail # Exit if any command in a pipeline fails
@@ -27,7 +33,7 @@ prompt_command() {
   echo "2. Backup"
   echo "3. Upgrade"
   echo "4. Renew certificates"
-  echo "5. Restore (from backup)"
+  echo "5. Restore from backup"
   echo "6. Help"
   echo "7. Exit"
   echo -n "Enter your choice [1-7]: " >/dev/tty
@@ -39,25 +45,44 @@ prompt_command() {
     initial_setup
     ;;
   2)
-    echo "Running Backups one time backup of mongodb, redis and sqlite..."
-    BACKUP_DIR="/backups"
-    TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
-    MONGO_DUMP_PATH="$BACKUP_DIR/mongo_backup_$TIMESTAMP"
-    REDIS_DUMP_PATH="$BACKUP_DIR/redis_backup_$TIMESTAMP"
+    read -p "Backup support currently requires an S3-compatible storage provider. Do you want to continue? (yes/no): " choice
 
-    # mongo backup
-    docker exec mongodb mkdir -p "$MONGO_DUMP_PATH"
-    docker exec mongodb mongodump --out="$MONGO_DUMP_PATH"
-    echo "Mongo backup available at: $MONGODB_DB_BACKUPS_DIR"
+    # Convert input to lowercase to handle YES, Yes, yEs, etc.
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
 
-    # redis backup
-    docker exec redis mkdir -p "$REDIS_DUMP_PATH"
-    docker exec redis redis-cli CONFIG SET dir "$REDIS_DUMP_PATH" && redis-cli BGSAVE
-    echo "Redis backup available at: $REDIS_DB_BACKUPS_DIR"
+    if [[ "$choice" == "yes" || "$choice" == "y" ]]; then
+      read -p "What is the S3 ACCESS KEY ID?: " AWS_ACCESS_KEY_ID
+      export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+      update_env_file AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY_ID
 
-    # sqlite backup
-    tar cvf $ROOT_DIR/$SQLITE_DB_DIR sqlite_backup_$TIMESTAMP.tgz
-    echo "SQLite backup available at: $ROOT_DIR/$SQLITE_DB_DIR"
+      read -p "What is the S3 SECRET ACCESS KEY?: " AWS_SECRET_ACCESS_KEY
+      export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+      update_env_file AWS_SECRET_ACCESS_KEY $AWS_SECRET_ACCESS_KEY
+
+      read -p "Will you be using AWS S3 directly? (yes/no): " isAwsS3
+      isAwsS3=$(echo "$isAwsS3" | tr '[:upper:]' '[:lower:]')
+      if [[ "$isAwsS3" == "no" || "$isAwsS3" == "n" ]]; then
+        read -p "What is the S3 endpoint URL?: " AWS_ENDPOINT_URL
+        export AWS_ENDPOINT_URL="$AWS_ENDPOINT_URL"
+        update_env_file AWS_ENDPOINT_URL $AWS_ENDPOINT_URL
+      fi
+
+      set_aws_credentials
+
+      chmod +x $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh
+      chmod +x $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh
+
+      MONGO_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh >> /var/log/mongo-backup.log 2>&1"
+      (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+      REDIS_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh >> /var/log/redis-backup.log 2>&1"
+      (crontab -l 2>/dev/null | grep -Fq "$REDIS_BACKUP_CRON") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+
+    else
+        echo "You choose not to continue. Skipping backup setup."
+    fi
+    
+    echo "Backup setup complete. Please be sure to save your .env file in a safe place in the event of a restore from backup."
+
     ;;
   3)
     echo "Upgrading to latest code..."
@@ -78,10 +103,64 @@ prompt_command() {
     renew_certificates
     ;;
   5)
+    # TODO: add larger message about whats about to happen and prompt to continue y/n
     echo "Restore from backup..."
-    latest_backup=$(ls -td $ROOT_DIR/$MONGODB_DB_BACKUPS_DIR/mongo_backup_* 2>/dev/null | head -n 1)
-    # TODO: if none exist, log warning and skip
-    docker exec mongodb mongorestore --dir="$BACKUP_DIR"
+
+    ENV_FILE="$(whoami)/.env"
+
+    if [ ! -e $ENV_FILE ]; then
+        echo "$ENV_FILE does not exist. Add .env and retry."
+        exit 1
+    fi
+
+    if ! grep -q '^AWS_ACCESS_KEY_ID=' "$ENV_FILE"; then
+        echo "Error: The following keys are missing in $ENV_FILE: AWS_ACCESS_KEY_ID"
+    fi
+
+    if ! grep -q '^AWS_SECRET_ACCESS_KEY=' "$ENV_FILE"; then
+        echo "Error: The following keys are missing in $ENV_FILE: AWS_SECRET_ACCESS_KEY"
+    fi
+
+    set -o allexport
+    source $ENV_FILE
+    set +o allexport
+
+    set_aws_credentials
+
+    update_dns_resolvers
+    install_dependencies
+    setup_firewall
+    clone_repo
+
+    cp $ENV_FILE $ROOT_DIR/.env
+
+    docker-compose -f docker-compose-self-hosted.yml down
+    
+    echo "Building re-usable docker image, this may take a while..."
+    docker builder build -t self-hosted/forwardemail.net:latest .
+    docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml up -d
+
+    # restore redis
+    LATEST_REDIS_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix redis-backups/ \
+    --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
+    aws s3 cp s3://forwardemail-selfhosted/$LATEST_REDIS_BACKUP /tmp/dump.rdb
+    mv /tmp/dump.rdb $ROOT_DIR/redis-data/dump.rdb
+    # docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml restart redis
+
+    # restore mongo
+    LATEST_MONGO_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix mongo-backups/ \
+    --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
+    aws s3 cp s3://forwardemail-selfhosted/$LATEST_MONGO_BACKUP /tmp/mongo-backup.tgz
+    tar -xzf /tmp/mongo-backup.tgz -C $ROOT_DIR/mongo-backups/
+    LATEST_MONGO_BACKUP_FILE=$(basename $LATEST_MONGO_BACKUP)
+    docker exec -i mongodb mongorestore --drop --dir "/tmp/$LATEST_MONGO_BACKUP_FILE"
+
+    # restore sqlite
+    LATEST_SQLITE_BACKUP=$(aws s3api list-objects-v2 --bucket production-sqlite-storage \
+    --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
+    aws s3 cp s3://production-sqlite-storage/$LATEST_SQLITE_BACKUP /tmp/
+    mv /tmp/*sqlite* $HOME/forwardemail.net/sqlite-data/
+
     echo "✅ Restore from backup complete..."
     ;;
   6)
@@ -108,29 +187,29 @@ install_dependencies() {
   # Update package list and install dependencies
   # NOTE: should we pipe all this to > /dev/null 2>&1
   # curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  sudo apt-get update -y -q > /dev/null 2>&1
-  sudo apt-get install -y -q \
+  apt-get update -y -q > /dev/null 2>&1
+  apt-get install -y -q \
     ca-certificates \
     curl \
     gnupg \
     git \
     openssl \
     certbot \
-    docker-compose > /dev/null 2>&1
-    # nodejs
+    docker-compose \
+    awscli > /dev/null 2>&1
 
 
   # Add Docker’s official GPG key
-  sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc >/dev/null
-  sudo chmod a+r /etc/apt/keyrings/docker.asc
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | tee /etc/apt/keyrings/docker.asc >/dev/null
+  chmod a+r /etc/apt/keyrings/docker.asc
 
   # Add Docker repository
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list >/dev/null
 
   # Update package index and install Docker
-  sudo apt-get update -y -q > /dev/null 2>&1
-  sudo apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1
+  apt-get update -y -q > /dev/null 2>&1
+  apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1
 
   # Verify installation
   docker --version
@@ -149,6 +228,26 @@ check_docker_running() {
     fi
   else
     echo "✅ Docker is running."
+  fi
+}
+
+set_aws_credentials() {
+  mkdir -p ~/.aws
+
+  cat > ~/.aws/credentials <<EOF
+[default]
+aws_access_key_id = $AWS_ACCESS_KEY_ID
+aws_secret_access_key = $AWS_SECRET_ACCESS_KEY
+EOF
+
+  cat > ~/.aws/config <<EOF
+[default]
+region = auto
+output = json
+EOF
+
+  if [[ -n $AWS_ENDPOINT_URL ]]; then
+    echo "endpoint_url = $AWS_ENDPOINT_URL" >> ~/.aws/config
   fi
 }
 
@@ -180,10 +279,8 @@ update_env_file() {
 
   # Check if the key exists in the file
   if grep -qE "^${key}=" "$ROOT_DIR/$ENV_FILE"; then
-    echo "Updating $key to $value in $ENV_FILE"
     sed $sed_flag -E "s|^${key}=.*|${key}=${value}|" "$ROOT_DIR/$ENV_FILE"
   else
-    echo "Adding $key=$value to $ROOT_DIR/$ENV_FILE"
     echo "${key}=${value}" >>"$ROOT_DIR/$ENV_FILE"
   fi
 }
@@ -221,12 +318,7 @@ update_default_env() {
   update_env_file ENABLE_MONITOR_SERVER false
   update_env_file DOMAIN $domain
   update_env_file WEBSITE_URL $domain
-  update_env_file REDIS_S3_BACKUPS_ENABLED true
-  update_env_file REDIS_S3_BACKUP_BUCKET redis-database-backups
-  update_env_file REDIS_S3_BACKUPS_DIR "/data"
-  update_env_file MONGO_S3_BACKUPS_ENABLED true
-  update_env_file MONGO_S3_BACKUP_BUCKET mongo-database-backups
-  update_env_file MONGO_S3_BACKUPS_DIR "/data/db"
+  update_env_file CACHE_RESPONSES true
 }
 
 update_ssl_paths() {
@@ -410,7 +502,7 @@ initial_setup() {
   update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
 
   echo "Spinning up necessary infrastructure..."
-  sudo docker-compose -f docker-compose-self-hosted.yml up -d
+  docker-compose -f docker-compose-self-hosted.yml up -d
 
   echo "✅ Setup completed successfully!"
 

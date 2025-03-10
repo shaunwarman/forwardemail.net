@@ -286,8 +286,8 @@ if (boolean(process.env.SELF_HOSTED)) {
     },
     {
       name: 'check-smtp-frozen-queue',
-      interval: '1m',
-      timeout: '5m'
+      interval: '5m',
+      timeout: '30m'
     },
     {
       name: 'check-smtp-queue-count',
@@ -297,12 +297,12 @@ if (boolean(process.env.SELF_HOSTED)) {
     {
       name: 'parse-logs',
       interval: '5m',
-      timeout: '1m'
+      timeout: '10m'
     },
     {
       name: 'update-uceprotect',
       interval: '1h',
-      timeout: '5m'
+      timeout: '15m'
     },
     {
       name: 'update-umbrella',

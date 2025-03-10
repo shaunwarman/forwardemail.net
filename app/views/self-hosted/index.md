@@ -47,13 +47,14 @@ Before running the installation script, ensure you have the following:
 * **Resources**: 4 vCPUs and 8GB RAM
 * **Root Access**: Administrative privileges to execute commands.
 * **Domain Name**: A custom domain ready for DNS configuration.
+* **Clean IP**: Ensure your server has a clean IP address with no prior spam reputation by checking blacklists. More info [here](#what-tools-should-i-use-to-check-ip-reputation).
 
 #### Install
 
 Run the following command in your server to download and execute the installation script:
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/forwardemail/forwardemail.net/master/self-hosting/setup.sh | bash
+bash <(curl -fsSL selfhost.forwardemail.net)
 ```
 
 ##### Prompts
@@ -235,6 +236,8 @@ You can run `docker ps -a` to see everything (including containers that aren't r
 
 You can get more logs via `docker logs -f <container_name>`. If anything exited, it's likely related to the `.env` file being configured incorrectly.
 
+Within the web UI, you can view `/admin/emails` and `/admin/logs` for outbound email logs and error logs respectively.
+
 #### What tool(s) should I use to test email configuration best practices?
 
 [mxtoolbox](https://mxtoolbox.com/)
@@ -242,6 +245,8 @@ You can get more logs via `docker logs -f <container_name>`. If anything exited,
 [google postmaster tools](https://postmaster.google.com/)
 
 #### What tool(s) should I use to check IP reputation?
+
+Use your server IP address to check against the following sites if they are on a blacklist. It's, unfortunately, not uncommon for common cloud providers to have IP reputation issues do to email spam usage. If you see your IP on a blacklist, it is recommended to spin up a new server and check the new IP address.
 
 [spamhaus](https://check.spamhaus.org/)
 
