@@ -106,24 +106,17 @@ prompt_command() {
     # TODO: add larger message about whats about to happen and prompt to continue y/n
     echo "Restore from backup..."
 
-    ENV_FILE="$(whoami)/.env"
+    ENV_FILE="/$(whoami)/.env"
 
     if [ ! -e $ENV_FILE ]; then
         echo "$ENV_FILE does not exist. Add .env and retry."
         exit 1
     fi
 
-    if ! grep -q '^AWS_ACCESS_KEY_ID=' "$ENV_FILE"; then
-        echo "Error: The following keys are missing in $ENV_FILE: AWS_ACCESS_KEY_ID"
-    fi
-
-    if ! grep -q '^AWS_SECRET_ACCESS_KEY=' "$ENV_FILE"; then
-        echo "Error: The following keys are missing in $ENV_FILE: AWS_SECRET_ACCESS_KEY"
-    fi
-
-    set -o allexport
-    source $ENV_FILE
-    set +o allexport
+    export_from_env_file AWS_ACCESS_KEY_ID
+    export_from_env_file AWS_SECRET_ACCESS_KEY
+    export_from_env_file AWS_ENDPOINT_URL
+    export_from_env_file DOMAIN
 
     set_aws_credentials
 
@@ -135,31 +128,44 @@ prompt_command() {
     cp $ENV_FILE $ROOT_DIR/.env
 
     docker-compose -f docker-compose-self-hosted.yml down
+
+    remove_from_schema
+    generate_certificates
+    update_ssl_paths
+
+    # this is a workaround for the build, will set after
+    update_env_file "DKIM_PRIVATE_KEY_PATH" ""
     
     echo "Building re-usable docker image, this may take a while..."
     docker builder build -t self-hosted/forwardemail.net:latest .
-    docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml up -d
+
+    openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
+    update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
+
+    # TODO this could be cleaner
+    cp $ENV_FILE $ROOT_DIR/.env
 
     # restore redis
     LATEST_REDIS_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix redis-backups/ \
     --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://forwardemail-selfhosted/$LATEST_REDIS_BACKUP /tmp/dump.rdb
     mv /tmp/dump.rdb $ROOT_DIR/redis-data/dump.rdb
-    # docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml restart redis
 
     # restore mongo
     LATEST_MONGO_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix mongo-backups/ \
     --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://forwardemail-selfhosted/$LATEST_MONGO_BACKUP /tmp/mongo-backup.tgz
     tar -xzf /tmp/mongo-backup.tgz -C $ROOT_DIR/mongo-backups/
-    LATEST_MONGO_BACKUP_FILE=$(basename $LATEST_MONGO_BACKUP)
-    docker exec -i mongodb mongorestore --drop --dir "/tmp/$LATEST_MONGO_BACKUP_FILE"
+    LATEST_MONGO_BACKUP_PATH=$(basename $LATEST_MONGO_BACKUP .tgz)
 
     # restore sqlite
     LATEST_SQLITE_BACKUP=$(aws s3api list-objects-v2 --bucket production-sqlite-storage \
     --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://production-sqlite-storage/$LATEST_SQLITE_BACKUP /tmp/
     mv /tmp/*sqlite* $HOME/forwardemail.net/sqlite-data/
+
+    docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml up -d
+    docker exec -i mongodb mongorestore --drop --dir "/backups/$LATEST_MONGO_BACKUP_PATH
 
     echo "✅ Restore from backup complete..."
     ;;
@@ -180,6 +186,15 @@ prompt_command() {
     echo "Invalid choice. Please select a valid option."
     ;;
   esac
+}
+
+export_from_env_file () {
+  if ! grep -q "^$1=" "$ENV_FILE"; then
+    echo "Error: The following key is missing in $ENV_FILE: $1"
+    return 1
+  fi
+
+  export "$1"="$(grep "^$1=" "$ENV_FILE" | cut -d'=' -f2-)"
 }
 
 install_dependencies() {
@@ -316,8 +331,8 @@ update_default_env() {
   update_env_file SMTP_EXCHANGE_DOMAINS mx.{{DOMAIN}}
   update_env_file SELF_HOSTED true
   update_env_file ENABLE_MONITOR_SERVER false
-  update_env_file DOMAIN $domain
-  update_env_file WEBSITE_URL $domain
+  update_env_file DOMAIN $DOMAIN
+  update_env_file WEBSITE_URL $DOMAIN
   update_env_file CACHE_RESPONSES true
 }
 
@@ -347,18 +362,18 @@ validate_domain() {
 
 # Generate SSL certificates and DKIM key
 generate_certificates() {
-  echo "Generating SSL certificates for *.$domain"
+  echo "Generating SSL certificates for *.$DOMAIN"
 
-  rm -rf /etc/letsencrypt/live/$domain*/*
+  rm -rf /etc/letsencrypt/live/$DOMAIN*/*
   mkdir -p "$ROOT_DIR/ssl"
 
   # https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.$DOMAIN
 
   # let's encrypt doesn't need an email because htey don't send renewal notices anymore
   # https://letsencrypt.org/2025/01/22/ending-expiration-emails/
-  certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$domain" -d "$domain" </dev/tty >/dev/tty 2>&1
+  certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
 
-  cp /etc/letsencrypt/live/$domain*/* "$ROOT_DIR/ssl"
+  cp /etc/letsencrypt/live/$DOMAIN*/* "$ROOT_DIR/ssl"
 }
 
 renew_certificates() {
@@ -367,9 +382,9 @@ renew_certificates() {
   # TODO: should we check expiration of current certs?
   # /etc/letsencrypt/live/$domain*/*
 
-  certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$domain" -d "$domain" </dev/tty >/dev/tty 2>&1
+  certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
 
-  cp /etc/letsencrypt/live/$domain*/* "$ROOT_DIR/ssl"
+  cp /etc/letsencrypt/live/$DOMAIN*/* "$ROOT_DIR/ssl"
 }
 
 # Generate various encryption keys
@@ -428,8 +443,8 @@ create_db_directories() {
 
 input_custom_domain() {
   while true; do
-    read -rp "Enter the domain name you are setting up (e.g. example.com): " domain </dev/tty
-    if validate_domain "$domain"; then
+    read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
+    if validate_domain "$DOMAIN"; then
       echo "✅ Domain name is valid."
       break
     else
@@ -487,7 +502,6 @@ initial_setup() {
   update_ssl_paths
 
   # export env vars needed for docker compose file template strings
-  export DOMAIN=$domain
   export SQLITE_STORAGE_PATH="sqlite_storage" # TODO: needs to be dynamic or come from env?
 
   create_db_directories

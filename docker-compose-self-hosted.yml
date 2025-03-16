@@ -15,6 +15,11 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "api.${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -38,6 +43,10 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -54,6 +63,10 @@ services:
     volumes:
       - ./ssl:/app/ssl/
       - ./.env:/app/.env
+    restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -77,6 +90,9 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -102,6 +118,9 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -126,6 +145,10 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -142,6 +165,11 @@ services:
       - ./.env:/app/.env
       - ./ssl:/app/ssl/
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -183,6 +211,10 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -202,6 +234,11 @@ services:
       - /mnt/${SQLITE_STORAGE_PATH}:/mnt/${SQLITE_STORAGE_PATH}
       - ./.env:/app/.env
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -226,6 +263,11 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -249,6 +291,11 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    extra_hosts:
+      - "${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
+      - "imap.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
