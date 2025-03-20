@@ -125,6 +125,11 @@ prompt_command() {
     setup_firewall
     clone_repo
 
+    if [[ -f "$ENV_FILE" ]]; then
+      mv "$ENV_FILE" ".env.bak"
+      echo "Moving existing env file '$ENV_FILE' to .env.bak."
+    fi
+
     cp $ENV_FILE $ROOT_DIR/.env
 
     docker-compose -f docker-compose-self-hosted.yml down
@@ -165,7 +170,7 @@ prompt_command() {
     mv /tmp/*sqlite* $HOME/forwardemail.net/sqlite-data/
 
     docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml up -d
-    docker exec -i mongodb mongorestore --drop --dir "/backups/$LATEST_MONGO_BACKUP_PATH
+    docker exec -i mongodb mongorestore --drop --dir /backups/$LATEST_MONGO_BACKUP_PATH
 
     echo "✅ Restore from backup complete..."
     ;;
@@ -303,11 +308,11 @@ update_env_file() {
 update_default_env() {
   update_env_file NODE_ENV production
   update_env_file HTTP_PROTOCOL https
-  update_env_file SQLITE_HOST 127.0.0.1
+  update_env_file SQLITE_HOST sqlite.{{DOMAIN}}
   update_env_file WEB_HOST {{DOMAIN}}
   update_env_file WEB_PORT 443
-  update_env_file CALDAV_HOST 127.0.0.1
-  update_env_file API_HOST 127.0.0.1
+  update_env_file CALDAV_HOST caldav.{{DOMAIN}}
+  update_env_file API_HOST api.{{DOMAIN}}
   update_env_file APP_NAME {{DOMAIN}}
   update_env_file TRANSPORT_DEBUG true
   update_env_file SEND_EMAIL true
@@ -321,13 +326,13 @@ update_default_env() {
   update_env_file MX_PORT 25
   update_env_file SQLITE_STORAGE_PATH sqlite_storage
   update_env_file SMTP_TRANSPORT_PASS "Thisisapassword123"
-  update_env_file SMTP_HOST 127.0.0.1
+  update_env_file SMTP_HOST smtp.{{DOMAIN}}
   update_env_file SMTP_PORT 465
-  update_env_file IMAP_HOST 127.0.0.1
+  update_env_file IMAP_HOST imap.{{DOMAIN}}
   update_env_file IMAP_PORT 993
-  update_env_file POP3_HOST 127.0.0.1
+  update_env_file POP3_HOST pop3.{{DOMAIN}}
   update_env_file POP3_PORT 995
-  update_env_file MX_HOST 127.0.0.1
+  update_env_file MX_HOST mx.{{DOMAIN}}
   update_env_file SMTP_EXCHANGE_DOMAINS mx.{{DOMAIN}}
   update_env_file SELF_HOSTED true
   update_env_file ENABLE_MONITOR_SERVER false
@@ -443,7 +448,7 @@ create_db_directories() {
 
 input_custom_domain() {
   while true; do
-    read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
+    read -rp "Enter the domain name you are setting up \(e.g. example.com\): " DOMAIN </dev/tty
     if validate_domain "$DOMAIN"; then
       echo "✅ Domain name is valid."
       break
@@ -454,7 +459,7 @@ input_custom_domain() {
 }
 
 input_user_pass() {
-  echo "Let's create a username and password for the initial user."
+  echo "Let\'s create a username and password for the initial user."
   while true; do
     read -rp "Enter a username for the initial login " username </dev/tty
     if [[ -n "$username" ]]; then
@@ -481,12 +486,8 @@ initial_setup() {
   setup_firewall
   clone_repo
 
-  if [[ -f "$ENV_FILE" ]]; then
-    mv "$ENV_FILE" ".env.bak"
-    echo "Moving existing env file '$ENV_FILE' to .env.bak."
-  fi
 
-  cp "$ENV_FILE_DEFAULTS" "$ENV_FILE"
+  # cp "$ENV_FILE_DEFAULTS" "$ENV_FILE"
 
   check_docker_running
 
@@ -519,8 +520,6 @@ initial_setup() {
   docker-compose -f docker-compose-self-hosted.yml up -d
 
   echo "✅ Setup completed successfully!"
-
-  echo "Follow the rest of the guide for DNS configuration..."
 }
 
 prompt_command

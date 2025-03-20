@@ -18,8 +18,9 @@ services:
     extra_hosts:
       - "${DOMAIN}:127.0.0.1"
       - "api.${DOMAIN}:127.0.0.1"
-      - "smtp.${DOMAIN}:127.0.0.1"
+      - "caldav.${DOMAIN}:127.0.0.1"
       - "imap.${DOMAIN}:127.0.0.1"
+      - "smtp.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -265,6 +266,7 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "${DOMAIN}:127.0.0.1"
+      - "caldav.${DOMAIN}:127.0.0.1"
       - "imap.${DOMAIN}:127.0.0.1"
       - "smtp.${DOMAIN}:127.0.0.1"
       - "sqlite.${DOMAIN}:127.0.0.1"
