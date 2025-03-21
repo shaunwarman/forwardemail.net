@@ -13,6 +13,8 @@
 set -e          # Exit immediately if a command exits with a non-zero status
 set -o pipefail # Exit if any command in a pipeline fails
 
+DEBUG=${DEBUG:-false}
+
 REPO_FOLDER_NAME="forwardemail.net"
 REPO_URL="https://github.com/shaunwarman/forwardemail.net.git"
 
@@ -24,7 +26,24 @@ ENV_FILE_DEFAULTS=".env.defaults"
 ENV_FILE_SCHEMA=".env.schema"
 ENV_FILE=".env"
 
-ROOT_DIR="/$(whoami)/$REPO_FOLDER_NAME"
+ROOT_DIR="/$(pwd)/$REPO_FOLDER_NAME"
+
+run_cmd() {
+  if [[ "$DEBUG" == "true" ]]; then
+    echo "+ $*" # Print the command (optional for debugging)
+    "$@"
+  else
+    "$@" >/dev/null 2>&1
+  fi
+}
+
+run_silent() {
+  if [[ "$DEBUG" == "true" ]]; then
+    "$@" # Run the command with output shown
+  else
+    "$@" >/dev/null 2>&1 || echo "Command failed: $*"
+  fi
+}
 
 # Prompt user to confirm setup
 prompt_command() {
@@ -73,14 +92,20 @@ prompt_command() {
       chmod +x $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh
 
       MONGO_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh >> /var/log/mongo-backup.log 2>&1"
-      (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+      (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (
+        crontab -l 2>/dev/null
+        echo "$CRON_JOB"
+      ) | crontab -
       REDIS_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh >> /var/log/redis-backup.log 2>&1"
-      (crontab -l 2>/dev/null | grep -Fq "$REDIS_BACKUP_CRON") || (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+      (crontab -l 2>/dev/null | grep -Fq "$REDIS_BACKUP_CRON") || (
+        crontab -l 2>/dev/null
+        echo "$CRON_JOB"
+      ) | crontab -
 
     else
-        echo "You choose not to continue. Skipping backup setup."
+      echo "You choose not to continue. Skipping backup setup."
     fi
-    
+
     echo "Backup setup complete. Please be sure to save your .env file in a safe place in the event of a restore from backup."
 
     ;;
@@ -106,11 +131,11 @@ prompt_command() {
     # TODO: add larger message about whats about to happen and prompt to continue y/n
     echo "Restore from backup..."
 
-    ENV_FILE="/$(whoami)/.env"
+    ENV_FILE="/$(pwd)/.env"
 
     if [ ! -e $ENV_FILE ]; then
-        echo "$ENV_FILE does not exist. Add .env and retry."
-        exit 1
+      echo "$ENV_FILE does not exist. Add .env and retry."
+      exit 1
     fi
 
     export_from_env_file AWS_ACCESS_KEY_ID
@@ -125,11 +150,6 @@ prompt_command() {
     setup_firewall
     clone_repo
 
-    if [[ -f "$ENV_FILE" ]]; then
-      mv "$ENV_FILE" ".env.bak"
-      echo "Moving existing env file '$ENV_FILE' to .env.bak."
-    fi
-
     cp $ENV_FILE $ROOT_DIR/.env
 
     docker-compose -f docker-compose-self-hosted.yml down
@@ -140,7 +160,7 @@ prompt_command() {
 
     # this is a workaround for the build, will set after
     update_env_file "DKIM_PRIVATE_KEY_PATH" ""
-    
+
     echo "Building re-usable docker image, this may take a while..."
     docker builder build -t self-hosted/forwardemail.net:latest .
 
@@ -152,20 +172,20 @@ prompt_command() {
 
     # restore redis
     LATEST_REDIS_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix redis-backups/ \
-    --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
+      --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://forwardemail-selfhosted/$LATEST_REDIS_BACKUP /tmp/dump.rdb
     mv /tmp/dump.rdb $ROOT_DIR/redis-data/dump.rdb
 
     # restore mongo
     LATEST_MONGO_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix mongo-backups/ \
-    --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
+      --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://forwardemail-selfhosted/$LATEST_MONGO_BACKUP /tmp/mongo-backup.tgz
     tar -xzf /tmp/mongo-backup.tgz -C $ROOT_DIR/mongo-backups/
     LATEST_MONGO_BACKUP_PATH=$(basename $LATEST_MONGO_BACKUP .tgz)
 
     # restore sqlite
     LATEST_SQLITE_BACKUP=$(aws s3api list-objects-v2 --bucket production-sqlite-storage \
-    --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
+      --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://production-sqlite-storage/$LATEST_SQLITE_BACKUP /tmp/
     mv /tmp/*sqlite* $HOME/forwardemail.net/sqlite-data/
 
@@ -193,7 +213,7 @@ prompt_command() {
   esac
 }
 
-export_from_env_file () {
+export_from_env_file() {
   if ! grep -q "^$1=" "$ENV_FILE"; then
     echo "Error: The following key is missing in $ENV_FILE: $1"
     return 1
@@ -207,7 +227,7 @@ install_dependencies() {
   # Update package list and install dependencies
   # NOTE: should we pipe all this to > /dev/null 2>&1
   # curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-  apt-get update -y -q > /dev/null 2>&1
+  apt-get update -y -q
   apt-get install -y -q \
     ca-certificates \
     curl \
@@ -215,21 +235,23 @@ install_dependencies() {
     git \
     openssl \
     certbot \
-    docker-compose \
-    awscli > /dev/null 2>&1
+    docker-compose
 
+  # ubuntu 24 doesn't have awscli
+  # https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+  snap install aws-cli --classic
 
   # Add Docker’s official GPG key
   install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | tee /etc/apt/keyrings/docker.asc >/dev/null
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | tee /etc/apt/keyrings/docker.asc
   chmod a+r /etc/apt/keyrings/docker.asc
 
   # Add Docker repository
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list >/dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list
 
   # Update package index and install Docker
-  apt-get update -y -q > /dev/null 2>&1
-  apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1
+  apt-get update -y -q
+  apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
   # Verify installation
   docker --version
@@ -244,7 +266,7 @@ check_docker_running() {
     systemctl start docker
     if ! docker info >/dev/null 2>&1; then
       echo "Docker issues with systemctl, using dockerd directly..."
-      nohup dockerd > /dev/null 2>/dev/null &
+      nohup dockerd >/dev/null 2>/dev/null &
     fi
   else
     echo "✅ Docker is running."
@@ -254,20 +276,20 @@ check_docker_running() {
 set_aws_credentials() {
   mkdir -p ~/.aws
 
-  cat > ~/.aws/credentials <<EOF
+  cat >~/.aws/credentials <<EOF
 [default]
 aws_access_key_id = $AWS_ACCESS_KEY_ID
 aws_secret_access_key = $AWS_SECRET_ACCESS_KEY
 EOF
 
-  cat > ~/.aws/config <<EOF
+  cat >~/.aws/config <<EOF
 [default]
 region = auto
 output = json
 EOF
 
   if [[ -n $AWS_ENDPOINT_URL ]]; then
-    echo "endpoint_url = $AWS_ENDPOINT_URL" >> ~/.aws/config
+    echo "endpoint_url = $AWS_ENDPOINT_URL" >>~/.aws/config
   fi
 }
 
@@ -425,18 +447,18 @@ clone_repo() {
 }
 
 setup_firewall() {
-  ufw default deny incoming > /dev/null 2>&1
+  ufw default deny incoming >/dev/null 2>&1
 
   PORTS=(22 25 80 443 465 587 993 995 2993 2995 3456 4000 5000)
 
   for port in "${PORTS[@]}"; do
     ufw allow "${port}/tcp" >/dev/null 2>&1
   done
-  
-  ufw allow from 127.0.0.1 to any port 27017 > /dev/null 2>&1
-  ufw allow from 127.0.0.1 to any port 6379 > /dev/null 2>&1
 
-  echo "y" | ufw enable > /dev/null 2>&1
+  ufw allow from 127.0.0.1 to any port 27017 >/dev/null 2>&1
+  ufw allow from 127.0.0.1 to any port 6379 >/dev/null 2>&1
+
+  echo "y" | ufw enable >/dev/null 2>&1
   ufw status
 }
 
@@ -448,7 +470,7 @@ create_db_directories() {
 
 input_custom_domain() {
   while true; do
-    read -rp "Enter the domain name you are setting up \(e.g. example.com\): " DOMAIN </dev/tty
+    read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
     if validate_domain "$DOMAIN"; then
       echo "✅ Domain name is valid."
       break
@@ -459,7 +481,7 @@ input_custom_domain() {
 }
 
 input_user_pass() {
-  echo "Let\'s create a username and password for the initial user."
+  echo "Let's create a username and password for the initial user."
   while true; do
     read -rp "Enter a username for the initial login " username </dev/tty
     if [[ -n "$username" ]]; then
@@ -482,12 +504,16 @@ input_user_pass() {
 
 initial_setup() {
   update_dns_resolvers
-  install_dependencies
+  run_silent install_dependencies
   setup_firewall
   clone_repo
 
+  if [[ -f "$ENV_FILE" ]]; then
+    mv "$ENV_FILE" ".env.bak"
+    echo "Moving existing env file '$ENV_FILE' to .env.bak."
+  fi
 
-  # cp "$ENV_FILE_DEFAULTS" "$ENV_FILE"
+  cp "$ENV_FILE_DEFAULTS" "$ENV_FILE"
 
   check_docker_running
 
@@ -520,6 +546,8 @@ initial_setup() {
   docker-compose -f docker-compose-self-hosted.yml up -d
 
   echo "✅ Setup completed successfully!"
+
+  echo "Follow the rest of the guide for DNS configuration..."
 }
 
 prompt_command
