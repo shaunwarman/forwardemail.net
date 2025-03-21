@@ -56,7 +56,7 @@ prompt_command() {
   echo "6. Help"
   echo "7. Exit"
   echo -n "Enter your choice [1-7]: " >/dev/tty
-  read choice </dev/tty
+  read -r choice </dev/tty
 
   case $choice in
   1)
@@ -64,32 +64,32 @@ prompt_command() {
     initial_setup
     ;;
   2)
-    read -p "Backup support currently requires an S3-compatible storage provider. Do you want to continue? (yes/no): " choice
+    read -rp "Backup support currently requires an S3-compatible storage provider. Do you want to continue? (yes/no): " choice
 
     # Convert input to lowercase to handle YES, Yes, yEs, etc.
     choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
 
     if [[ "$choice" == "yes" || "$choice" == "y" ]]; then
-      read -p "What is the S3 ACCESS KEY ID?: " AWS_ACCESS_KEY_ID
+      read -rp "What is the S3 ACCESS KEY ID?: " AWS_ACCESS_KEY_ID
       export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-      update_env_file AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY_ID
+      update_env_file AWS_ACCESS_KEY_ID "$AWS_ACCESS_KEY_ID"
 
-      read -p "What is the S3 SECRET ACCESS KEY?: " AWS_SECRET_ACCESS_KEY
+      read -rp "What is the S3 SECRET ACCESS KEY?: " AWS_SECRET_ACCESS_KEY
       export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
-      update_env_file AWS_SECRET_ACCESS_KEY $AWS_SECRET_ACCESS_KEY
+      update_env_file AWS_SECRET_ACCESS_KEY "$AWS_SECRET_ACCESS_KEY"
 
-      read -p "Will you be using AWS S3 directly? (yes/no): " isAwsS3
+      read -rp "Will you be using AWS S3 directly? (yes/no): " isAwsS3
       isAwsS3=$(echo "$isAwsS3" | tr '[:upper:]' '[:lower:]')
       if [[ "$isAwsS3" == "no" || "$isAwsS3" == "n" ]]; then
-        read -p "What is the S3 endpoint URL?: " AWS_ENDPOINT_URL
+        read -rp "What is the S3 endpoint URL?: " AWS_ENDPOINT_URL
         export AWS_ENDPOINT_URL="$AWS_ENDPOINT_URL"
-        update_env_file AWS_ENDPOINT_URL $AWS_ENDPOINT_URL
+        update_env_file AWS_ENDPOINT_URL "$AWS_ENDPOINT_URL"
       fi
 
       set_aws_credentials
 
-      chmod +x $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh
-      chmod +x $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh
+      chmod +x "$HOME"/forwardemail.net/self-hosting/scripts/backup-mongo.sh
+      chmod +x "$HOME"/forwardemail.net/self-hosting/scripts/backup-redis.sh
 
       MONGO_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh >> /var/log/mongo-backup.log 2>&1"
       (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (
@@ -133,7 +133,7 @@ prompt_command() {
 
     ENV_FILE="/$(pwd)/.env"
 
-    if [ ! -e $ENV_FILE ]; then
+    if [ ! -e "$ENV_FILE" ]; then
       echo "$ENV_FILE does not exist. Add .env and retry."
       exit 1
     fi
@@ -150,7 +150,7 @@ prompt_command() {
     setup_firewall
     clone_repo
 
-    cp $ENV_FILE $ROOT_DIR/.env
+    cp "$ENV_FILE" "$ROOT_DIR"/.env
 
     docker-compose -f docker-compose-self-hosted.yml down
 
@@ -168,29 +168,29 @@ prompt_command() {
     update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
 
     # TODO this could be cleaner
-    cp $ENV_FILE $ROOT_DIR/.env
+    cp "$ENV_FILE" "$ROOT_DIR"/.env
 
     # restore redis
     LATEST_REDIS_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix redis-backups/ \
       --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
-    aws s3 cp s3://forwardemail-selfhosted/$LATEST_REDIS_BACKUP /tmp/dump.rdb
-    mv /tmp/dump.rdb $ROOT_DIR/redis-data/dump.rdb
+    aws s3 cp s3://forwardemail-selfhosted/"$LATEST_REDIS_BACKUP" /tmp/dump.rdb
+    mv /tmp/dump.rdb "$ROOT_DIR"/redis-data/dump.rdb
 
     # restore mongo
     LATEST_MONGO_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix mongo-backups/ \
       --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
-    aws s3 cp s3://forwardemail-selfhosted/$LATEST_MONGO_BACKUP /tmp/mongo-backup.tgz
-    tar -xzf /tmp/mongo-backup.tgz -C $ROOT_DIR/mongo-backups/
-    LATEST_MONGO_BACKUP_PATH=$(basename $LATEST_MONGO_BACKUP .tgz)
+    aws s3 cp s3://forwardemail-selfhosted/"$LATEST_MONGO_BACKUP" /tmp/mongo-backup.tgz
+    tar -xzf /tmp/mongo-backup.tgz -C "$ROOT_DIR"/mongo-backups/
+    LATEST_MONGO_BACKUP_PATH=$(basename "$LATEST_MONGO_BACKUP" .tgz)
 
     # restore sqlite
     LATEST_SQLITE_BACKUP=$(aws s3api list-objects-v2 --bucket production-sqlite-storage \
       --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
-    aws s3 cp s3://production-sqlite-storage/$LATEST_SQLITE_BACKUP /tmp/
-    mv /tmp/*sqlite* $HOME/forwardemail.net/sqlite-data/
+    aws s3 cp s3://production-sqlite-storage/"$LATEST_SQLITE_BACKUP" /tmp/
+    mv /tmp/*sqlite* "$HOME"/forwardemail.net/sqlite-data/
 
-    docker-compose -f $ROOT_DIR/docker-compose-self-hosted.yml up -d
-    docker exec -i mongodb mongorestore --drop --dir /backups/$LATEST_MONGO_BACKUP_PATH
+    docker-compose -f "$ROOT_DIR"/docker-compose-self-hosted.yml up -d
+    docker exec -i mongodb mongorestore --drop --dir /backups/"$LATEST_MONGO_BACKUP_PATH"
 
     echo "✅ Restore from backup complete..."
     ;;
@@ -358,8 +358,8 @@ update_default_env() {
   update_env_file SMTP_EXCHANGE_DOMAINS mx.{{DOMAIN}}
   update_env_file SELF_HOSTED true
   update_env_file ENABLE_MONITOR_SERVER false
-  update_env_file DOMAIN $DOMAIN
-  update_env_file WEBSITE_URL $DOMAIN
+  update_env_file DOMAIN "$DOMAIN"
+  update_env_file WEBSITE_URL "$DOMAIN"
   update_env_file CACHE_RESPONSES true
 }
 
@@ -391,7 +391,7 @@ validate_domain() {
 generate_certificates() {
   echo "Generating SSL certificates for *.$DOMAIN"
 
-  rm -rf /etc/letsencrypt/live/$DOMAIN*/*
+  rm -rf /etc/letsencrypt/live/"$DOMAIN"*/*
   mkdir -p "$ROOT_DIR/ssl"
 
   # https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.$DOMAIN
@@ -400,7 +400,7 @@ generate_certificates() {
   # https://letsencrypt.org/2025/01/22/ending-expiration-emails/
   certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
 
-  cp /etc/letsencrypt/live/$DOMAIN*/* "$ROOT_DIR/ssl"
+  cp /etc/letsencrypt/live/"$DOMAIN"*/* "$ROOT_DIR/ssl"
 }
 
 renew_certificates() {
@@ -411,7 +411,7 @@ renew_certificates() {
 
   certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
 
-  cp /etc/letsencrypt/live/$DOMAIN*/* "$ROOT_DIR/ssl"
+  cp /etc/letsencrypt/live/"$DOMAIN"*/* "$ROOT_DIR/ssl"
 }
 
 # Generate various encryption keys
@@ -419,13 +419,13 @@ generate_encryption_keys() {
   echo "Generating encryption keys and secrets"
 
   helper_encryption_key=$(openssl rand -base64 32 | tr -d /=+ | cut -c -32)
-  update_env_file "HELPER_ENCRYPTION_KEY" $helper_encryption_key
+  update_env_file "HELPER_ENCRYPTION_KEY" "$helper_encryption_key"
 
   srs_secret=$(openssl rand -base64 32 | tr -d /=+ | cut -c -32)
-  update_env_file "SRS_SECRET" $srs_secret
+  update_env_file "SRS_SECRET" "$srs_secret"
 
   txt_encryption_key=$(openssl rand -hex 16)
-  update_env_file "TXT_ENCRYPTION_KEY" $txt_encryption_key
+  update_env_file "TXT_ENCRYPTION_KEY" "$txt_encryption_key"
 
   echo "Helper and SRS encryption keys generated"
 }
@@ -441,7 +441,7 @@ clone_repo() {
   else
     echo "Cloning repository from $REPO_URL..."
     git clone "$REPO_URL"
-    cd $ROOT_DIR
+    cd "$ROOT_DIR"
     git checkout -b feat/self-hosted-mvp origin/feat/self-hosted-mvp
   fi
 }
