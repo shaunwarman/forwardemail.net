@@ -19,10 +19,16 @@
 # ... this will be even easier for vendor marketplace apps as the user can defined variables that are injected here as well
 #cloud-config
 # write_files:
-#   - path: /etc/profile.d/marketplace.sh
-#     content: |
-#       export MARKETPLACE_DEPLOYMENT="true"
-#       export PROVIDER="digitalocean"
+#  - path: /root/cloudflare.ini
+#    content: |
+#      dns_cloudflare_email = "your-email@example.com"
+#      dns_cloudflare_api_key = "your-cloudflare-global-api-key"
+#    owner: root:root
+#    permissions: '0600'
+#  - path: /etc/profile.d/marketplace.sh
+#    content: |
+#      export MARKETPLACE_DEPLOYMENT="true"
+#      export PROVIDER="digitalocean"
 
 # runcmd:
 #   - chmod +x /etc/profile.d/marketplace.sh
@@ -415,7 +421,11 @@ generate_certificates() {
 
   # let's encrypt doesn't need an email because htey don't send renewal notices anymore
   # https://letsencrypt.org/2025/01/22/ending-expiration-emails/
-  certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
+  if [[ "$MARKETPLACE_DEPLOYMENT" == "true" ]]; then
+    certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.cloudflare.ini \ -d "$DOMAIN" -d "*.$DOMAIN" --non-interactive --agree-tos --email "$EMAIL"  
+  else
+    certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
+  fi
 
   # https://certbot-dns-cloudflare.readthedocs.io/en/stable/
   # /root/cloudflare.ini
