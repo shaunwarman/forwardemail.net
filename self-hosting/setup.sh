@@ -10,6 +10,23 @@
 # https://www.spamrats.com/lookup.php?ip=<ip>
 # https://check.spamhaus.org/results/?query=<ip>
 
+# TODO: one click marketplaces
+# https://docs.vultr.com/vultr-marketplace#6.-create-the-application-instructions
+# https://marketplace.digitalocean.com/vendors/guidelines-resources
+# https://github.com/digitalocean/marketplace-partners
+
+# TODO: cloud config works for most cloud providers, creates a simple way to inject context, set variables for the user
+# ... this will be even easier for vendor marketplace apps as the user can defined variables that are injected here as well
+#cloud-config
+# write_files:
+#   - path: /etc/profile.d/marketplace.sh
+#     content: |
+#       export MARKETPLACE_DEPLOYMENT="true"
+#       export PROVIDER="digitalocean"
+
+# runcmd:
+#   - chmod +x /etc/profile.d/marketplace.sh
+
 set -e          # Exit immediately if a command exits with a non-zero status
 set -o pipefail # Exit if any command in a pipeline fails
 
@@ -399,6 +416,12 @@ generate_certificates() {
   # let's encrypt doesn't need an email because htey don't send renewal notices anymore
   # https://letsencrypt.org/2025/01/22/ending-expiration-emails/
   certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
+
+  # https://certbot-dns-cloudflare.readthedocs.io/en/stable/
+  # /root/cloudflare.ini
+  # dns_cloudflare_email = "your-email@example.com"
+  # dns_cloudflare_api_key = "your-cloudflare-global-api-key"
+  # certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.cloudflare.ini \ -d "$DOMAIN" -d "*.$DOMAIN" --non-interactive --agree-tos --email admin@example.com
 
   cp /etc/letsencrypt/live/"$DOMAIN"*/* "$ROOT_DIR/ssl"
 }
