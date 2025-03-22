@@ -258,7 +258,8 @@ install_dependencies() {
     git \
     openssl \
     certbot \
-    docker-compose
+    docker-compose \
+    python3-certbot-dns-cloudflare
 
   # ubuntu 24 doesn't have awscli
   # https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
@@ -422,7 +423,7 @@ generate_certificates() {
   # let's encrypt doesn't need an email because htey don't send renewal notices anymore
   # https://letsencrypt.org/2025/01/22/ending-expiration-emails/
   if [[ "$MARKETPLACE_DEPLOYMENT" == "true" ]]; then
-    certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.cloudflare.ini \ -d "$DOMAIN" -d "*.$DOMAIN" --non-interactive --agree-tos --email "$EMAIL"  
+    certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.cloudflare.ini -d "$DOMAIN" -d "*.$DOMAIN" --non-interactive --agree-tos --email "$EMAIL"  
   else
     certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
   fi
@@ -502,19 +503,30 @@ create_db_directories() {
 }
 
 input_custom_domain() {
-  while true; do
-    read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
-    if validate_domain "$DOMAIN"; then
-      echo "✅ Domain name is valid."
-      break
-    else
-      echo "❌ Invalid domain name. Please enter a valid one."
-    fi
-  done
+  if [[ -z "$DOMAIN" ]]; then
+    while true; do
+      read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
+      if validate_domain "$DOMAIN"; then
+        echo "✅ Domain name is valid."
+        break
+      else
+        echo "❌ Invalid domain name. Please enter a valid one."
+      fi
+    done
+  else
+    echo "DOMAIN already set: $DOMAIN"
+  fi
 }
 
 input_user_pass() {
-  echo "Let's create a username and password for the initial user."
+  echo -e "\n\n=======================================================================================\n"
+  echo -e "  Let's create a one time username and password for basic auth to protect the site."
+  echo -e "  This will be used once post initial self hosted setup."
+  echo -e "  You'll create an account through the site directly for all account administration thereafter."
+  echo -e "\n=========================================================================================\n\n"
+
+  read -rp "Press Enter to continue..."
+
   while true; do
     read -rp "Enter a username for the initial login " username </dev/tty
     if [[ -n "$username" ]]; then
@@ -569,7 +581,13 @@ initial_setup() {
   # take down any previous setup
   docker-compose -f docker-compose-self-hosted.yml down
 
-  echo "Building re-usable docker image..."
+  echo -e "\n\n=======================================================================================\n"
+  echo -e "  We have all the information we need. Now building the self hosted application and related components."
+  echo -e "  This could take up to 10 minutes. Once complete, all components will be spun up and ready to use."
+  echo -e "\n=========================================================================================\n\n"
+
+  read -rp "Press Enter to continue..."
+
   docker builder build -t self-hosted/forwardemail.net:latest .
 
   openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
