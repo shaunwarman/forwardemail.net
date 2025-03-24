@@ -1,7 +1,8 @@
 version: '3.8'
 services:
   web:
-    image: self-hosted/forwardemail.net
+    # image: self-hosted/forwardemail.net
+    image: shaunw321/fe-local-slim
     container_name: web
     network_mode: host
     hostname: ${DOMAIN}
@@ -183,6 +184,7 @@ services:
     image: mongo:latest
     container_name: mongodb
     network_mode: host
+    restart: unless-stopped
     volumes:
       - mongo-data:/data/db
       - ./mongo-backups:/backups
@@ -191,6 +193,7 @@ services:
     image: redis:latest
     container_name: redis
     network_mode: host
+    restart: unless-stopped
     volumes:
       - ./redis-data:/data
     env_file:

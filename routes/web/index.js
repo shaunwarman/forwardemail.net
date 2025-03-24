@@ -4,6 +4,7 @@
  */
 
 const path = require('node:path');
+const process = require('node:process');
 
 const { setTimeout } = require('node:timers/promises');
 const Boom = require('@hapi/boom');

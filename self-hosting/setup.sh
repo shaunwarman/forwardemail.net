@@ -11,15 +11,18 @@
 # https://check.spamhaus.org/results/?query=<ip>
 
 # TODO: one click marketplaces
+# vultr doesn't support smtp in marketplace
 # https://docs.vultr.com/vultr-marketplace#6.-create-the-application-instructions
 # https://marketplace.digitalocean.com/vendors/guidelines-resources
 # https://github.com/digitalocean/marketplace-partners
+# https://github.com/dalisoft/awesome-hosting?tab=readme-ov-file#baas
+# https://github.com/awesome-selfhosted/awesome-selfhosted?tab=readme-ov-file#communication---email---complete-solutions
 
 # TODO: cloud config works for most cloud providers, creates a simple way to inject context, set variables for the user
 # ... this will be even easier for vendor marketplace apps as the user can defined variables that are injected here as well
 #cloud-config
 # write_files:
-#  - path: /root/cloudflare.ini
+#  - path: /root/.cloudflare.ini
 #    content: |
 #      dns_cloudflare_email = "your-email@example.com"
 #      dns_cloudflare_api_key = "your-cloudflare-global-api-key"
@@ -117,12 +120,12 @@ prompt_command() {
       MONGO_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh >> /var/log/mongo-backup.log 2>&1"
       (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (
         crontab -l 2>/dev/null
-        echo "$CRON_JOB"
+        echo "$MONGO_BACKUP_CRON"
       ) | crontab -
       REDIS_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh >> /var/log/redis-backup.log 2>&1"
       (crontab -l 2>/dev/null | grep -Fq "$REDIS_BACKUP_CRON") || (
         crontab -l 2>/dev/null
-        echo "$CRON_JOB"
+        echo "$REDIS_BACKUP_CRON"
       ) | crontab -
 
     else
@@ -133,18 +136,32 @@ prompt_command() {
 
     ;;
   3)
-    echo "Upgrading to latest code..."
-    clone_repo
+    
+    AUTO_UPDATE_CRON="0 1 * * * ROOT_DIR=$ROOT_DIR sh -c '$DOCKER_UPDATE_CMD' >> /var/log/autoupdate.log 2>&1"
+    
+    if crontab -l 2>/dev/null | grep -Fq "$AUTO_UPDATE_CRON"; then
+      echo "✅ Cron job is already set. No changes made."
+      exit 0
+    fi
 
-    echo "Taking down infrastructure..."
-    docker-compose -f docker-compose-self-hosted.yml down
+    echo -e "\n========================================="
+    echo "🚀 Docker Compose Auto-Update Script"
+    echo "========================================="
+    echo "This script will do the following:"
+    echo "Pull the latest Docker images."
+    echo "Restart your self-hosted services using docker-compose."
+    echo "Log the output to /var/log/autoupdate.log."
+    echo -e "=========================================\n"
 
-    echo "Building re-usable docker image..."
-    docker builder build -t self-hosted/forwardemail.net:latest .
+    read -rp "Press Enter to continue or Ctrl+C to cancel..."
+    
+    DOCKER_UPDATE_CMD="docker compose pull && docker compose -f \$ROOT_DIR/docker-compose-self-hosted.yml up -d"
+    (crontab -l 2>/dev/null | grep -Fq "$AUTO_UPDATE_CRON") || (
+      crontab -l 2>/dev/null
+      echo "$AUTO_UPDATE_CRON"
+    ) | crontab -
 
-    echo "Spinning up infrastructure..."
-    docker-compose -f docker-compose-self-hosted.yml up -d
-    echo "✅ Upgrade complete..."
+    echo "✅ Upgrade cron setup complete..."
     ;;
   4)
     echo "Renewing certificates..."
@@ -183,9 +200,6 @@ prompt_command() {
 
     # this is a workaround for the build, will set after
     update_env_file "DKIM_PRIVATE_KEY_PATH" ""
-
-    echo "Building re-usable docker image, this may take a while..."
-    docker builder build -t self-hosted/forwardemail.net:latest .
 
     openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
     update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
@@ -322,12 +336,14 @@ update_dns_resolvers() {
 
   # lots of issues with local resolvers for some cloud providers, so use cloudflare by default
   # this directly affects certbot setup and acme-challenge txt record checks
-  echo "nameserver 1.1.1.1" | tee /etc/resolv.conf
   if systemctl is-active --quiet systemd-resolved; then
+    rm /etc/resolv.conf
     systemctl stop systemd-resolved
     systemctl disable systemd-resolved
     systemctl mask systemd-resolved
   fi
+  
+  echo "nameserver 1.1.1.1" | tee /etc/resolv.conf
 
   echo "DNS update complete!"
 }
@@ -396,13 +412,16 @@ update_ssl_paths() {
     "$ENV_FILE"
 }
 
+# TODO: we may need this logic in CI if we are building / publishing images ahead of time
 remove_from_schema() {
+  echo "Called remove_from_schema with ENV_FILE_SCHEMA as $ENV_FILE_SCHEMA"
   sed -i -E \
     -e '/^APPLE/d' \
     -e '/^MICROSOFT/d' \
     -e '/^TWILIO/d' \
     -e '/^PAYPAL/d' \
     -e '/^STRIPE/d' \
+    -e '/^SRS_SECRET/d' \
     "$ENV_FILE_SCHEMA"
 }
 
@@ -422,7 +441,7 @@ generate_certificates() {
 
   # let's encrypt doesn't need an email because htey don't send renewal notices anymore
   # https://letsencrypt.org/2025/01/22/ending-expiration-emails/
-  if [[ "$MARKETPLACE_DEPLOYMENT" == "true" ]]; then
+  if [[ -f "/root/.cloudflare.ini" ]]; then
     certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.cloudflare.ini -d "$DOMAIN" -d "*.$DOMAIN" --non-interactive --agree-tos --email "$EMAIL"  
   else
     certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
@@ -519,16 +538,16 @@ input_custom_domain() {
 }
 
 input_user_pass() {
-  echo -e "\n\n=======================================================================================\n"
-  echo -e "  Let's create a one time username and password for basic auth to protect the site."
-  echo -e "  This will be used once post initial self hosted setup."
-  echo -e "  You'll create an account through the site directly for all account administration thereafter."
-  echo -e "\n=========================================================================================\n\n"
+  echo -e "\n\n================================================================================================\n"
+  echo -e "  Let's create a one time username and password for initial login to protect the site."
+  echo -e "  This will be used only once. Expect a browser popup for these credentials"
+  echo -e "  Afterwards, you will create an account through the site directly for all account administration."
+  echo -e "\n===================================================================================================\n\n"
 
-  read -rp "Press Enter to continue..."
+  read -rp "Press Enter to continue or Ctrl+C to cancel..."
 
   while true; do
-    read -rp "Enter a username for the initial login " username </dev/tty
+    read -rp "Username: " username </dev/tty
     if [[ -n "$username" ]]; then
       echo "✅ Username is valid."
       break
@@ -537,7 +556,7 @@ input_user_pass() {
     fi
   done
   while true; do
-    read -rp "Enter a password for the initial login " password </dev/tty
+    read -rp "Password: " password </dev/tty
     if [[ -n "$password" ]]; then
       echo "✅ Password is valid."
       break
@@ -565,6 +584,8 @@ initial_setup() {
   input_custom_domain
   remove_from_schema
   update_default_env
+  
+  # TODO if AUTH_BASIC_USERNAME / AUTH_BASIC_PASSWORD already set skip over this
   input_user_pass
   update_env_file "AUTH_BASIC_USERNAME" "$username"
   update_env_file "AUTH_BASIC_PASSWORD" "$password"
@@ -580,15 +601,6 @@ initial_setup() {
 
   # take down any previous setup
   docker-compose -f docker-compose-self-hosted.yml down
-
-  echo -e "\n\n=======================================================================================\n"
-  echo -e "  We have all the information we need. Now building the self hosted application and related components."
-  echo -e "  This could take up to 10 minutes. Once complete, all components will be spun up and ready to use."
-  echo -e "\n=========================================================================================\n\n"
-
-  read -rp "Press Enter to continue..."
-
-  docker builder build -t self-hosted/forwardemail.net:latest .
 
   openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
   update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
