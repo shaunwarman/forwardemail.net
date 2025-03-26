@@ -1,13 +1,10 @@
-name: Build and Publish Docker Image
+name: Build and Publish Self-Hosted Docker Image
 on:
-  - push
-  - pull_request
-# on:
-#   push:
-#     tags:
-#       - 'v*'  # Trigger the workflow on tags starting with 'v', for example v1.0.0
-#   release:
-#     types: [published]  # Trigger the workflow on new releases
+  push:
+    tags:
+      - 'v*'  # Trigger the workflow on tags starting with 'v', for example v1.0.0
+  release:
+    types: [published]  # Trigger the workflow on new releases
 
 jobs:
   build-and-publish:
@@ -78,15 +75,14 @@ jobs:
       # Build / Publish the Docker image to GitHub Container Registry
       - name: Build / Publish Docker image to GitHub Container Registry
         run: |
-          TAG_NAME=$(echo ${{ github.ref }} | sed 's/refs\/tags\///g')
-          IMAGE_NAME=ghcr.io/${{ github.repository }}-selfhosted/$TAG_NAME
+          IMAGE_NAME=ghcr.io/${{ github.repository }}-selfhosted:${{ github.ref_name }}
           docker build -f Dockerfile-selfhosted -t $IMAGE_NAME .
           
           # Tag the image as 'latest' to update the latest tag
-          docker tag $IMAGE_NAME ghcr.io/${{ github.repository }}-selfhosted/latest
+          docker tag $IMAGE_NAME ghcr.io/${{ github.repository }}-selfhosted:latest
           
           # Push both the versioned and latest tags to GitHub Container Registry
           docker push $IMAGE_NAME
-          docker push ghcr.io/${{ github.repository }}-selfhosted/latest
+          docker push ghcr.io/${{ github.repository }}-selfhosted:latest
         env:
           DOCKER_CLI_EXPERIMENTAL: enabled
