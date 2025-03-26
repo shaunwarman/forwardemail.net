@@ -52,7 +52,7 @@ ENV_FILE_DEFAULTS=".env.defaults"
 ENV_FILE_SCHEMA=".env.schema"
 ENV_FILE=".env"
 
-ROOT_DIR="/$(pwd)/$REPO_FOLDER_NAME"
+ROOT_DIR="$(pwd)/$REPO_FOLDER_NAME"
 
 run_cmd() {
   if [[ "$DEBUG" == "true" ]]; then
@@ -137,7 +137,8 @@ prompt_command() {
     ;;
   3)
     
-    AUTO_UPDATE_CRON="0 1 * * * ROOT_DIR=$ROOT_DIR sh -c '$DOCKER_UPDATE_CMD' >> /var/log/autoupdate.log 2>&1"
+    DOCKER_UPDATE_CMD="docker compose pull && docker compose -f $ROOT_DIR/docker-compose-self-hosted.yml up -d"
+    AUTO_UPDATE_CRON="0 1 * * * $DOCKER_UPDATE_CMD >> /var/log/autoupdate.log 2>&1"
     
     if crontab -l 2>/dev/null | grep -Fq "$AUTO_UPDATE_CRON"; then
       echo "✅ Cron job is already set. No changes made."
@@ -145,17 +146,17 @@ prompt_command() {
     fi
 
     echo -e "\n========================================="
-    echo "🚀 Docker Compose Auto-Update Script"
+    echo "🚀 Docker Compose Auto-Update Cron"
     echo "========================================="
-    echo "This script will do the following:"
-    echo "Pull the latest Docker images."
+    echo "This cron will setup the following:"
+    echo "Pull the latest Docker image."
     echo "Restart your self-hosted services using docker-compose."
     echo "Log the output to /var/log/autoupdate.log."
+    echo "Once setup, this will run every night just after midnight (1 AM)."
     echo -e "=========================================\n"
 
     read -rp "Press Enter to continue or Ctrl+C to cancel..."
-    
-    DOCKER_UPDATE_CMD="docker compose pull && docker compose -f \$ROOT_DIR/docker-compose-self-hosted.yml up -d"
+
     (crontab -l 2>/dev/null | grep -Fq "$AUTO_UPDATE_CRON") || (
       crontab -l 2>/dev/null
       echo "$AUTO_UPDATE_CRON"

@@ -1,8 +1,8 @@
 name: Build and Publish Self-Hosted Docker Image
 on:
-  push:
-    tags:
-      - 'v*'  # Trigger the workflow on tags starting with 'v', for example v1.0.0
+  # push:
+  #   tags:
+  #     - 'v*'  # Trigger the workflow on tags starting with 'v', for example v1.0.0
   release:
     types: [published]  # Trigger the workflow on new releases
 
