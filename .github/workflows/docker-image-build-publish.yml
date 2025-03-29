@@ -76,7 +76,7 @@ jobs:
       - name: Build / Publish Docker image to GitHub Container Registry
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository }}-selfhosted:${{ github.ref_name }}
-          docker build -f Dockerfile-selfhosted -t $IMAGE_NAME .
+          docker build -f self-hosting/Dockerfile-selfhosted -t $IMAGE_NAME .
           
           # Tag the image as 'latest' to update the latest tag
           docker tag $IMAGE_NAME ghcr.io/${{ github.repository }}-selfhosted:latest

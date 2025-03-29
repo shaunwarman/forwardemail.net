@@ -1,6 +1,6 @@
 services:
   web:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: web
     network_mode: host
     hostname: ${DOMAIN}
@@ -29,7 +29,7 @@ services:
         condition: service_healthy
 
   api:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: api
     network_mode: host
     hostname: api.${DOMAIN}
@@ -56,7 +56,7 @@ services:
         condition: service_healthy
 
   bree:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: bree
     network_mode: host
     command: ["node", "bree.js"]
@@ -75,7 +75,7 @@ services:
 
   # https://forwardemail.net/en/faq#what-are-your-imap-server-configuration-settings
   imap:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: imap
     network_mode: host
     hostname: imap.${DOMAIN}
@@ -103,7 +103,7 @@ services:
 
   # https://forwardemail.net/en/faq#do-you-support-pop3
   pop3:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: pop3
     network_mode: host
     hostname: pop3.${DOMAIN}
@@ -131,7 +131,7 @@ services:
 
   # https://forwardemail.net/en/faq#what-are-your-smtp-server-configuration-settings
   smtp:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: smtp
     network_mode: host
     hostname: smtp.${DOMAIN}
@@ -156,7 +156,7 @@ services:
         condition: service_started
 
   smtp_bree:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: smtp_bree
     network_mode: host
     hostname: smtp.${DOMAIN}
@@ -198,7 +198,7 @@ services:
       - .env
 
   sqlite:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: sqlite
     network_mode: host
     hostname: sqlite.${DOMAIN}
@@ -226,7 +226,7 @@ services:
         condition: service_healthy
 
   sqlite_bree:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: sqlite_bree
     network_mode: host
     hostname: sqlite.${DOMAIN}
@@ -250,7 +250,7 @@ services:
         condition: service_healthy
 
   mx:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: mx
     network_mode: host
     command: ["node", "mx.js"]
@@ -280,7 +280,7 @@ services:
         condition: service_healthy
 
   caldav:
-    image: ghcr.io/forwardemail/forwardemail.net-selfhosted:latest
+    image: ghcr.io/shaunwarman/forwardemail.net-selfhosted:latest
     container_name: caldav
     network_mode: host
     hostname: caldav.${DOMAIN}

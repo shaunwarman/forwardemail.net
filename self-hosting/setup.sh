@@ -9,7 +9,7 @@ set -o pipefail # Exit if any command in a pipeline fails
 DEBUG=${DEBUG:-false}
 
 REPO_FOLDER_NAME="forwardemail.net"
-REPO_URL="https://github.com/forwardemail/forwardemail.net.git"
+REPO_URL="https://github.com/shaunwarman/forwardemail.net.git"
 
 MONGODB_DB_BACKUPS_DIR="mongo-backups"
 REDIS_DB_BACKUPS_DIR="redis-backups"
@@ -461,8 +461,16 @@ generate_encryption_keys() {
 }
 
 clone_repo() {
-  git clone --depth=1 "$REPO_URL"
+  git clone "$REPO_URL"
   cd "$ROOT_DIR"
+  git checkout -b feat/self-hosted-mvp origin/feat/self-hosted-mvp
+
+  # TODO move to sparse checkout of self-hosting folder only
+  # git clone --no-checkout "$REPO_URL"
+  # cd "$REPO_FOLDER_NAME"
+  # git sparse-checkout init --cone
+  # git sparse-checkout set self-hosting
+  # git checkout master
 }
 
 setup_firewall() {
