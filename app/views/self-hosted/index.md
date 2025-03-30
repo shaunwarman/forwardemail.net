@@ -1,6 +1,5 @@
 # Self Hosted
 
-
 ## Table of Contents
 
 - [Self Hosted](#self-hosted)
@@ -12,10 +11,12 @@
         - [Debug install script](#debug-install-script)
         - [Prompts](#prompts)
         - [Initial Setup (Option 1)](#initial-setup-option-1)
+          - [Cloud-init / User-data](#cloud-init--user-data)
     - [Services](#services)
         - [Important file paths](#important-file-paths)
     - [Configuration](#configuration)
       - [Initial DNS setup](#initial-dns-setup)
+        - [Reverse DNS / PTR record](#reverse-dns--ptr-record)
     - [Onboarding](#onboarding)
     - [Testing](#testing)
       - [Creating your first alias](#creating-your-first-alias)
@@ -27,7 +28,8 @@
       - [How do I upgrade to the latest forward email code?](#how-do-i-upgrade-to-the-latest-forward-email-code)
       - [How do I restore from a backup?](#how-do-i-restore-from-a-backup)
     - [Troubleshooting](#troubleshooting)
-      - [My docker build failed](#my-docker-build-failed)
+      - [Why is the certbot acme challenge failing?](#why-is-the-certbot-acme-challenge-failing)
+      - [What is the basic auth username and password?](#what-is-the-basic-auth-username-and-password)
       - [How do I know what is running?](#how-do-i-know-what-is-running)
       - [How do I know if something isn't running that should be?](#how-do-i-know-if-something-isnt-running-that-should-be)
       - [How do I find logs?](#how-do-i-find-logs)
@@ -44,11 +46,11 @@
 
 Before running the installation script, ensure you have the following:
 
-* **Operating System**: A Linux-based server (e.g. Ubuntu 22.04+).
-* **Resources**: 4 vCPUs and 8GB RAM
-* **Root Access**: Administrative privileges to execute commands.
-* **Domain Name**: A custom domain ready for DNS configuration.
-* **Clean IP**: Ensure your server has a clean IP address with no prior spam reputation by checking blacklists. More info [here](#what-tools-should-i-use-to-check-ip-reputation).
+- **Operating System**: A Linux-based server (e.g. Ubuntu 22.04+).
+- **Resources**: 4 vCPUs and 8GB RAM
+- **Root Access**: Administrative privileges to execute commands.
+- **Domain Name**: A custom domain ready for DNS configuration.
+- **Clean IP**: Ensure your server has a clean IP address with no prior spam reputation by checking blacklists. More info [here](#what-tools-should-i-use-to-check-ip-reputation).
 
 #### Install
 
@@ -78,11 +80,11 @@ DEBUG=true bash <(curl -fsSL selfhost.forwardemail.net)
 7. Exit
 ```
 
-* **Initial setup**: Download the latest forward email code, configure the environment, prompt for your custom domain and setup all necessary certificates, keys and secrets.
-* **Setup Backup**: Will setup a cron to backup mongoDB and redis using an S3-compatible store for secure, remote storage. Separately, sqlite will be backed up on login if there are changes for secure, encrypted backups.
-* **Setup Upgrade**: Setup a cron to look for nightly updates which will safely rebuild and restart infrastructure components.
-* **Renew certificates**: Certbot / lets encrypt is used for SSL certificates and keys will expire every 3 months. This will renew the certificates for your domain and place them in the necessary folder for related components to consume. See [important file paths](#important-file-paths)
-* **Restore from backup**: Will trigger mongodb and redis to restore from backup data.
+- **Initial setup**: Download the latest forward email code, configure the environment, prompt for your custom domain and setup all necessary certificates, keys and secrets.
+- **Setup Backup**: Will setup a cron to backup mongoDB and redis using an S3-compatible store for secure, remote storage. Separately, sqlite will be backed up on login if there are changes for secure, encrypted backups.
+- **Setup Upgrade**: Setup a cron to look for nightly updates which will safely rebuild and restart infrastructure components.
+- **Renew certificates**: Certbot / lets encrypt is used for SSL certificates and keys will expire every 3 months. This will renew the certificates for your domain and place them in the necessary folder for related components to consume. See [important file paths](#important-file-paths)
+- **Restore from backup**: Will trigger mongodb and redis to restore from backup data.
 
 ##### Initial Setup (Option 1)
 
@@ -90,14 +92,45 @@ Choose option `1. Initial setup` to begin.
 
 Once complete, you should see a success message. You can even run `docker ps` to see **the** components spun up. More information on componets below.
 
+###### Cloud-init / User-data
+
+Most cloud vendors support a cloud-init configuration for when the virtual private server (VPS) is provisioned. This is great way to set some files and environment variables ahead of time for use by the scripts initial setup logic.
+
+**Options**
+
+- `/root/.cloudflare.ini` - cloudflare configuration file used by certbot for DNS configuration. Read more [here](https://certbot-dns-cloudflare.readthedocs.io/en/stable/).
+- `EMAIL` - `EMAIL` environment variable used for certbot expiration reminders
+- `DOMAIN` - custom domain used for self hosting setup
+- `AUTH_BASIC_USERNAME` - username used in first time setup to protect the site
+- `AUTH_BASIC_PASSWORD` - passward used in first time setup to protect the site
+
+Example:
+
+```sh
+#cloud-config
+write_files:
+  - path: /root/cloudflare.ini
+    content: |
+      dns_cloudflare_api_token = "xxx"
+    owner: root:root
+    permissions: '0600'
+  - path: /etc/profile.d/env.sh
+    content: |
+      export EMAIL="test@myemail.com"
+      export DOMAIN="mydomain.com"
+
+runcmd:
+  - chmod +x /etc/profile.d/env.sh
+```
+
 ### Services
 
 | Service Name | Default Port | Description                                            |
 | ------------ | :----------: | ------------------------------------------------------ |
-| Web          |     `443`    | Web interface for all admin interactions               |
+| Web          |    `443`     | Web interface for all admin interactions               |
 | API          |    `4000`    | Api layer to abstract databases                        |
 | Bree         |     None     | Background job and task runner                         |
-| SMTP         |   `465/587`  | SMTP server for outboound email                        |
+| SMTP         |  `465/587`   | SMTP server for outboound email                        |
 | SMTP Bree    |     None     | SMTP background job                                    |
 | MX           |    `2525`    | Mail exchange for inbound email and email forwarding   |
 | IMAP         |  `993/2993`  | IMAP server for inbound email and mailbox management   |
@@ -105,8 +138,8 @@ Once complete, you should see a success message. You can even run `docker ps` to
 | SQLite       |    `3456`    | SQLite server for interactions with sqlite database(s) |
 | SQLite Bree  |     None     | SQLite background job                                  |
 | CalDAV       |    `5000`    | CalDAV server for calendar management                  |
-| MongoDB      |    `27017`   | MongoDB database for most data management              |
-| CalDAV       |    `6379`    | Redis database for caching                             |
+| MongoDB      |   `27017`    | MongoDB database for most data management              |
+| Redis        |    `6379`    | Redis for caching and state management                 |
 | SQLite       |     None     | SQLite database(s) for encrypted mailboxes             |
 
 ##### Important file paths
@@ -114,13 +147,14 @@ Once complete, you should see a success message. You can even run `docker ps` to
 | Component              |       Host path       | Container path               |
 | ---------------------- | :-------------------: | ---------------------------- |
 | MongoDB                |   `./mongo-backups`   | `/backups`                   |
+| Redis                  |    `./redis-data`     | `/data`                      |
 | Sqlite                 |    `./sqlite-data`    | `/mnt/{SQLITE_STORAGE_PATH}` |
-| Env file               |        `./.env`       | `/app/.env`                  |
+| Env file               |       `./.env`        | `/app/.env`                  |
 | SSL certs/keys         |        `./ssl`        | `/app/ssl/`                  |
 | Private key            |  `./ssl/privkey.pem`  | `/app/ssl/privkey.pem`       |
 | Full chain certificate | `./ssl/fullchain.pem` | `/app/ssl/fullchain.pem`     |
-| CA certificate         |    `./ssl/cert.pem`   | `/app/ssl/cert.pem`          |
-| DKIM private key       |    `./ssl/dkim.key`   | `/app/ssl/dkim.key`          |
+| CA certificate         |   `./ssl/cert.pem`    | `/app/ssl/cert.pem`          |
+| DKIM private key       |   `./ssl/dkim.key`    | `/app/ssl/dkim.key`          |
 
 > **💡 Tip:** Save the `.env` file securely. It is critical for recovery in case of failure.
 
@@ -143,21 +177,25 @@ In your DNS provider of choice, configure the appropriate DNS records. Do note a
 | MX    | <domain_name> | mx.<domain_name>               | auto |
 | TXT   | <domain_name> | "v=spf1 ip4:<ip_address> -all" | auto |
 
+##### Reverse DNS / PTR record
+
+Reverse DNS (rDNS) or reverse pointer records (PTR records) are essential for email servers because they help verify the legitimacy of the server sending the email. Each cloud provider does this differently, so you will need to lookup how to add "Reverse DNS" to map the host and IP to it's corresponding hostname. Most likely in the networking section of the provider.
+
 ### Onboarding
 
 1. Open the Landing Page
-   Navigate to https\://\<domain\_name>, replacing \<domain\_name> with the domain configured in your DNS settings. You should see the Forward Email landing page.
+   Navigate to https\://\<domain_name>, replacing \<domain_name> with the domain configured in your DNS settings. You should see the Forward Email landing page.
 
 2. Log In and Onboard Your Domain
 
-* Sign in with a valid email and password.
-* Enter the domain name you wish to set up (this must match the DNS configuration).
-* Follow the prompts to add the required **MX** and **TXT** records for verification.
+- Sign in with a valid email and password.
+- Enter the domain name you wish to set up (this must match the DNS configuration).
+- Follow the prompts to add the required **MX** and **TXT** records for verification.
 
 3. Complete Setup
 
-* Once verified, access the Aliases page to create your first alias.
-* Optionally, configure **SMTP for outbound email** in the **Domain Settings**. This requires additional DNS records.
+- Once verified, access the Aliases page to create your first alias.
+- Optionally, configure **SMTP for outbound email** in the **Domain Settings**. This requires additional DNS records.
 
 > **💡 Note:** No information is sent outside of your server. The self hosted option and initial account is just for the admin login and web view to manage domains, aliases and related email configurations.
 
@@ -174,21 +212,21 @@ https://<domain_name>/en/my-account/domains/<domain_name>/aliases
 
 2. Add a New Alias
 
-* Click **Add Alias** (top right).
-* Enter the alias name and adjust email settings as needed.
-* (Optional) Enable **IMAP/POP3/CalDAV** support by selecting the checkbox.
-* Click **Create Alias.**
+- Click **Add Alias** (top right).
+- Enter the alias name and adjust email settings as needed.
+- (Optional) Enable **IMAP/POP3/CalDAV** support by selecting the checkbox.
+- Click **Create Alias.**
 
 3. Set a Password
 
-* Click **Generate Password** to create a secure password.
-* This password will be required to log in to your email client.
+- Click **Generate Password** to create a secure password.
+- This password will be required to log in to your email client.
 
 4. Configure Your Email Client
 
-* Use an email client like Thunderbird.
-* Enter the alias name and generated password.
-* Configure the **IMAP** and **SMTP** settings accordingly.
+- Use an email client like Thunderbird.
+- Enter the alias name and generated password.
+- Configure the **IMAP** and **SMTP** settings accordingly.
 
 ##### Email server settings
 
@@ -223,9 +261,15 @@ Follow the [install script](./Install) and choose `option 6` in the prompt.
 
 ### Troubleshooting
 
-#### My docker build failed
+#### Why is the certbot acme challenge failing?
 
-It's possible that retrying will help in initial installation or upgrade. But, you may want to first rule out system resource constraints by checking disk availability. `docker system df` / `df -h` on linux. And rule out any firewall issues for installing dependencies from npm (`registry.npmjs.com`). If you still see issues, file a bug with log information at <https://github.com/forwardemail/forwardemail.net/issues>
+It is possible that DNS propagation has not completed. You can use tools like: `https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your_domain>`. This will give you an idea if your TXT record changes should be reflected. It's also possible that local DNS cache on your host is still using an old, stale value or hasn't picked up the recent changes.
+
+Another option is to use the automated cerbot DNS changes by setting the `/root/.cloudflare.ini` file with the api token in your cloud-init / user-data on initial VPS setup or create this file and run the script again. This will manage the DNS changes and challenge updates automatically.
+
+#### What is the basic auth username and password?
+
+For self hosting, we add a first time browser native authentication pop up with a simple username (`admin`) and password (randomly generated on initial setup). We just add this as a protection in case automation / scrapers somehow beat you to first sign up on the web experience. You can find this password after initial setup in your `.env` file under `AUTH_BASIC_USERNAME` and `AUTH_BASIC_PASSSWORD`. 
 
 #### How do I know what is running?
 

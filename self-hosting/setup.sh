@@ -9,17 +9,19 @@ set -o pipefail # Exit if any command in a pipeline fails
 DEBUG=${DEBUG:-false}
 
 REPO_FOLDER_NAME="forwardemail.net"
-REPO_URL="https://github.com/shaunwarman/forwardemail.net.git"
+REPO_URL="https://github.com/forwardemail/forwardemail.net.git"
+
 
 MONGODB_DB_BACKUPS_DIR="mongo-backups"
 REDIS_DB_BACKUPS_DIR="redis-backups"
 SQLITE_DB_DIR="sqlite-data"
 
 ENV_FILE_DEFAULTS=".env.defaults"
-ENV_FILE_SCHEMA=".env.schema"
 ENV_FILE=".env"
 
-ROOT_DIR="$(pwd)/$REPO_FOLDER_NAME"
+ROOT_DIR="/$(whoami)/$REPO_FOLDER_NAME"
+SELF_HOST_DIR="$ROOT_DIR/self-hosting"
+DOCKER_COMPOSE_FILE="$SELF_HOST_DIR/docker-compose-self-hosted.yml"
 
 run_cmd() {
   if [[ "$DEBUG" == "true" ]]; then
@@ -114,8 +116,6 @@ prompt_command() {
 
     ;;
   3)
-    
-    DOCKER_COMPOSE_FILE="$ROOT_DIR/docker-compose-self-hosted.yml"
     DOCKER_UPDATE_CMD="docker compose -f $DOCKER_COMPOSE_FILE pull && docker compose -f $DOCKER_COMPOSE_FILE up -d"
     AUTO_UPDATE_CRON="0 1 * * * $DOCKER_UPDATE_CMD >> /var/log/autoupdate.log 2>&1"
     
@@ -151,15 +151,25 @@ prompt_command() {
     renew_certificates
     ;;
   5)
-    # TODO: add larger message about whats about to happen and prompt to continue y/n
-    echo "Restore from backup..."
+    echo -e "\n========================================="
+    echo "Restore from Backup"
+    echo "========================================="
+    echo "You are about to attempt to restore from a backup! You must:"
+    echo "- add your .env file to the /root/.env"
+    echo "- have AWS S3 compatible credentials ready"
+    echo "- have backup files in forwardemail-selfhosted bucket"
+    echo "Once complete, you should have a running email setup from last checkpoint."
+    echo -e "=========================================\n"
 
-    ENV_FILE="/$(pwd)/.env"
+    read -rp "Press Enter to continue or Ctrl+C to cancel..."
 
-    if [ ! -e "$ENV_FILE" ]; then
-      echo "$ENV_FILE does not exist. Add .env and retry."
+    if [ ! -e "$ROOT_DIR/$ENV_FILE" ]; then
+      echo "$ROOT_DIR/$ENV_FILE does not exist. Add .env and retry."
       exit 1
     fi
+
+    cp "$ROOT_DIR/$ENV_FILE" "$SELF_HOST_DIR/$ENV_FILE"
+    mkdir -p "$SELF_HOST_DIR/ssl"
 
     export_from_env_file AWS_ACCESS_KEY_ID
     export_from_env_file AWS_SECRET_ACCESS_KEY
@@ -173,33 +183,25 @@ prompt_command() {
     setup_firewall
     clone_repo
 
-    cp "$ENV_FILE" "$ROOT_DIR"/.env
+    docker-compose -f "$DOCKER_COMPOSE_FILE" down
 
-    docker-compose -f docker-compose-self-hosted.yml down
-
-    remove_from_schema
     generate_certificates
     update_ssl_paths
 
-    # this is a workaround for the build, will set after
-    update_env_file "DKIM_PRIVATE_KEY_PATH" ""
-
-    openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
+    openssl genrsa -f4 -out "$SELF_HOST_DIR/ssl/dkim.key" 2048
     update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
-
-    cp "$ENV_FILE" "$ROOT_DIR"/.env
 
     # restore redis
     LATEST_REDIS_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix redis-backups/ \
       --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://forwardemail-selfhosted/"$LATEST_REDIS_BACKUP" /tmp/dump.rdb
-    mv /tmp/dump.rdb "$ROOT_DIR"/redis-data/dump.rdb
+    mv /tmp/dump.rdb "$SELF_HOST_DIR"/redis-data/dump.rdb
 
     # restore mongo
     LATEST_MONGO_BACKUP=$(aws s3api list-objects-v2 --bucket forwardemail-selfhosted --prefix mongo-backups/ \
       --query 'Contents | sort_by(@, &LastModified) | [-1].Key' --output text)
     aws s3 cp s3://forwardemail-selfhosted/"$LATEST_MONGO_BACKUP" /tmp/mongo-backup.tgz
-    tar -xzf /tmp/mongo-backup.tgz -C "$ROOT_DIR"/mongo-backups/
+    tar -xzf /tmp/mongo-backup.tgz -C "$SELF_HOST_DIR"/mongo-backups/
     LATEST_MONGO_BACKUP_PATH=$(basename "$LATEST_MONGO_BACKUP" .tgz)
 
     # restore sqlite
@@ -208,7 +210,7 @@ prompt_command() {
     aws s3 cp s3://production-sqlite-storage/"$LATEST_SQLITE_BACKUP" /tmp/
     mv /tmp/*sqlite* "$HOME"/forwardemail.net/sqlite-data/
 
-    docker-compose -f "$ROOT_DIR"/docker-compose-self-hosted.yml up -d
+    docker-compose -f "$DOCKER_COMPOSE_FILE" up -d
     docker exec -i mongodb mongorestore --drop --dir /backups/"$LATEST_MONGO_BACKUP_PATH"
 
     echo "✅ Restore from backup complete..."
@@ -233,8 +235,8 @@ prompt_command() {
 }
 
 export_from_env_file() {
-  if ! grep -q "^$1=" "$ENV_FILE"; then
-    echo "Error: The following key is missing in $ENV_FILE: $1"
+  if ! grep -q "^$1=" "$SELF_HOST_DIR/$ENV_FILE"; then
+    echo "Error: The following key is missing in $SELF_HOST_DIR/$ENV_FILE: $1"
     return 1
   fi
 
@@ -337,10 +339,10 @@ update_env_file() {
   # fi
 
   # Check if the key exists in the file
-  if grep -qE "^${key}=" "$ROOT_DIR/$ENV_FILE"; then
-    sed $sed_flag -E "s|^${key}=.*|${key}=${value}|" "$ROOT_DIR/$ENV_FILE"
+  if grep -qE "^${key}=" "$SELF_HOST_DIR/$ENV_FILE"; then
+    sed $sed_flag -E "s|^${key}=.*|${key}=${value}|" "$SELF_HOST_DIR/$ENV_FILE"
   else
-    echo "${key}=${value}" >>"$ROOT_DIR/$ENV_FILE"
+    echo "${key}=${value}" >>"$SELF_HOST_DIR/$ENV_FILE"
   fi
 }
 
@@ -386,19 +388,7 @@ update_ssl_paths() {
     -e 's|^(.*_)?SSL_KEY_PATH=.*|\1SSL_KEY_PATH=/app/ssl/privkey.pem|' \
     -e 's|^(.*_)?SSL_CERT_PATH=.*|\1SSL_CERT_PATH=/app/ssl/fullchain.pem|' \
     -e 's|^(.*_)?SSL_CA_PATH=.*|\1SSL_CA_PATH=/app/ssl/chain.pem|' \
-    "$ENV_FILE"
-}
-
-remove_from_schema() {
-  echo "Called remove_from_schema with ENV_FILE_SCHEMA as $ENV_FILE_SCHEMA"
-  sed -i -E \
-    -e '/^APPLE/d' \
-    -e '/^MICROSOFT/d' \
-    -e '/^TWILIO/d' \
-    -e '/^PAYPAL/d' \
-    -e '/^STRIPE/d' \
-    -e '/^SRS_SECRET/d' \
-    "$ENV_FILE_SCHEMA"
+    "$SELF_HOST_DIR/$ENV_FILE"
 }
 
 # Validate a domain name
@@ -409,7 +399,6 @@ validate_domain() {
 # Generate SSL certificates and DKIM key
 generate_certificates() {
   rm -rf /etc/letsencrypt/live/"$DOMAIN"*/*
-  mkdir -p "$ROOT_DIR/ssl"
 
   # https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.$DOMAIN
 
@@ -422,12 +411,12 @@ generate_certificates() {
   fi
 
   # https://certbot-dns-cloudflare.readthedocs.io/en/stable/
-  # /root/cloudflare.ini
+  # /root/.cloudflare.ini
   # dns_cloudflare_email = "your-email@example.com"
   # dns_cloudflare_api_key = "your-cloudflare-global-api-key"
   # certbot certonly --dns-cloudflare --dns-cloudflare-credentials /root/.cloudflare.ini \ -d "$DOMAIN" -d "*.$DOMAIN" --non-interactive --agree-tos --email admin@example.com
 
-  cp /etc/letsencrypt/live/"$DOMAIN"*/* "$ROOT_DIR/ssl"
+  cp /etc/letsencrypt/live/"$DOMAIN"*/* "$SELF_HOST_DIR/ssl"
 }
 
 renew_certificates() {
@@ -438,13 +427,11 @@ renew_certificates() {
 
   certbot certonly --manual --agree-tos --preferred-challenges dns -d "*.$DOMAIN" -d "$DOMAIN" </dev/tty >/dev/tty 2>&1
 
-  cp /etc/letsencrypt/live/"$DOMAIN"*/* "$ROOT_DIR/ssl"
+  cp /etc/letsencrypt/live/"$DOMAIN"*/* "$SELF_HOST_DIR/ssl"
 }
 
 # Generate various encryption keys
 generate_encryption_keys() {
-  echo "Generating encryption keys and secrets"
-
   helper_encryption_key=$(openssl rand -base64 32 | tr -d /=+ | cut -c -32)
   update_env_file "HELPER_ENCRYPTION_KEY" "$helper_encryption_key"
 
@@ -454,23 +441,23 @@ generate_encryption_keys() {
   txt_encryption_key=$(openssl rand -hex 16)
   update_env_file "TXT_ENCRYPTION_KEY" "$txt_encryption_key"
 
-  openssl genrsa -f4 -out "$ROOT_DIR/ssl/dkim.key" 2048
+  openssl genrsa -f4 -out "$SELF_HOST_DIR/ssl/dkim.key" 2048
   update_env_file "DKIM_PRIVATE_KEY_PATH" "/app/ssl/dkim.key"
 
   echo "Helper, DKIM and SRS encryption keys generated."
 }
 
 clone_repo() {
-  git clone "$REPO_URL"
-  cd "$ROOT_DIR"
-  git checkout -b feat/self-hosted-mvp origin/feat/self-hosted-mvp
-
-  # TODO move to sparse checkout of self-hosting folder only
-  # git clone --no-checkout "$REPO_URL"
-  # cd "$REPO_FOLDER_NAME"
-  # git sparse-checkout init --cone
-  # git sparse-checkout set self-hosting
-  # git checkout master
+  if [ -d "$ROOT_DIR" ]; then
+    echo "Directory $ROOT_DIR already exists. Skipping git clone."
+    cd "$ROOT_DIR"
+  else
+    git clone --no-checkout "$REPO_URL" "$ROOT_DIR"
+    cd "$ROOT_DIR"
+    git sparse-checkout init --cone
+    git sparse-checkout set self-hosting
+    git checkout feat/self-hosted-mvp
+  fi
 }
 
 setup_firewall() {
@@ -490,14 +477,15 @@ setup_firewall() {
 }
 
 create_db_directories() {
-  mkdir -p "$ROOT_DIR/$SQLITE_DB_DIR"
-  mkdir -p "$ROOT_DIR/$MONGODB_DB_BACKUPS_DIR"
-  mkdir -p "$ROOT_DIR/$REDIS_DB_BACKUPS_DIR"
+  mkdir -p "$SELF_HOST_DIR/$SQLITE_DB_DIR"
+  mkdir -p "$SELF_HOST_DIR/$MONGODB_DB_BACKUPS_DIR"
+  mkdir -p "$SELF_HOST_DIR/$REDIS_DB_BACKUPS_DIR"
 }
 
 input_custom_domain() {
-  if [[ -z "$DOMAIN" ]]; then
+  if [[ -n "$DOMAIN" ]]; then
     echo "DOMAIN already set: $DOMAIN"
+    update_env_file "DOMAIN" "$DOMAIN"
     return 1
   fi
 
@@ -505,6 +493,7 @@ input_custom_domain() {
     read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
     if validate_domain "$DOMAIN"; then
       echo "✅ Domain name is valid."
+      update_env_file "DOMAIN" "$DOMAIN"
       break
     else
       echo "❌ Invalid domain name. Please enter a valid one."
@@ -551,14 +540,14 @@ initial_setup() {
   echo "Cloning repository..."
   run_silent clone_repo
 
-  cp "$ENV_FILE_DEFAULTS" "$ENV_FILE"
+  cp "$ROOT_DIR/$ENV_FILE_DEFAULTS" "$SELF_HOST_DIR/$ENV_FILE"
+  mkdir -p "$SELF_HOST_DIR/ssl"
 
   run_silent check_docker_running
 
   input_custom_domain
 
   echo "Updating default environment variables..."
-  run_silent remove_from_schema
   run_silent update_default_env
   
   setup_one_time_login
@@ -578,14 +567,26 @@ initial_setup() {
   run_silent create_db_directories
 
   # take down any previous setup
-  docker-compose -f docker-compose-self-hosted.yml down
+  docker-compose -f "$DOCKER_COMPOSE_FILE" down
 
   echo "Spinning up necessary infrastructure..."
-  docker-compose -f docker-compose-self-hosted.yml up -d
+  docker-compose -f "$DOCKER_COMPOSE_FILE" up -d
 
   echo "✅ Setup completed successfully!"
 
   echo -e "\nContinue with the rest of the self hosted guide: https://forwardemail.net/self-hosted..."
 }
+
+# Check if the operating system is Ubuntu
+if [[ "$(uname -s)" != "Linux" || ! -f /etc/lsb-release ]]; then
+    echo -e "⚠️  Warning: This script is in beta and currently only supports Ubuntu. Your system is not supported yet."
+    exit 1
+fi
+
+source /etc/lsb-release
+if [[ "$DISTRIB_ID" != "Ubuntu" ]]; then
+    echo -e "⚠️  Warning: This script is in beta and currently only supports Ubuntu. Your system is not supported yet."
+    exit 1
+fi
 
 prompt_command
