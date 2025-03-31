@@ -70,49 +70,51 @@ prompt_command() {
     initial_setup
     ;;
   2)
-    read -rp "Backup support currently requires an S3-compatible storage provider. Do you want to continue? (yes/no): " choice
+    echo -e "\n========================================="
+    echo "Setup Backups"
+    echo "========================================="
+    echo -e "\nSetting up backups will create crons that will:"
+    echo "* Prompt for AWS Access Key ID, Secret and Endpoint URL (if necessary)."
+    echo "* Any S3 compatible option should work (e.g. AWS S3, Cloudflare R2, etc)."
+    echo "* Create crons for backing up redis and mongodb."
+    echo "* Note: Sqlite backups created on login, if mailbox changes (password needed for safe, encrypted mailbox backups)"
+    echo -e "=========================================\n"
 
-    # Convert input to lowercase to handle YES, Yes, yEs, etc.
-    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+    read -rp "Press Enter to continue or Ctrl+C to cancel..."
 
-    if [[ "$choice" == "yes" || "$choice" == "y" ]]; then
-      read -rp "What is the S3 ACCESS KEY ID?: " AWS_ACCESS_KEY_ID
-      export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
-      update_env_file AWS_ACCESS_KEY_ID "$AWS_ACCESS_KEY_ID"
+    read -rp "What is the S3 ACCESS KEY ID?: " AWS_ACCESS_KEY_ID
+    export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+    update_env_file AWS_ACCESS_KEY_ID "$AWS_ACCESS_KEY_ID"
 
-      read -rp "What is the S3 SECRET ACCESS KEY?: " AWS_SECRET_ACCESS_KEY
-      export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
-      update_env_file AWS_SECRET_ACCESS_KEY "$AWS_SECRET_ACCESS_KEY"
+    read -rp "What is the S3 SECRET ACCESS KEY?: " AWS_SECRET_ACCESS_KEY
+    export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+    update_env_file AWS_SECRET_ACCESS_KEY "$AWS_SECRET_ACCESS_KEY"
 
-      read -rp "Will you be using AWS S3 directly? (yes/no): " isAwsS3
-      isAwsS3=$(echo "$isAwsS3" | tr '[:upper:]' '[:lower:]')
-      if [[ "$isAwsS3" == "no" || "$isAwsS3" == "n" ]]; then
-        read -rp "What is the S3 endpoint URL?: " AWS_ENDPOINT_URL
-        export AWS_ENDPOINT_URL="$AWS_ENDPOINT_URL"
-        update_env_file AWS_ENDPOINT_URL "$AWS_ENDPOINT_URL"
-      fi
-
-      set_aws_credentials
-
-      chmod +x "$HOME"/forwardemail.net/self-hosting/scripts/backup-mongo.sh
-      chmod +x "$HOME"/forwardemail.net/self-hosting/scripts/backup-redis.sh
-
-      MONGO_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh >> /var/log/mongo-backup.log 2>&1"
-      (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (
-        crontab -l 2>/dev/null
-        echo "$MONGO_BACKUP_CRON"
-      ) | crontab -
-      REDIS_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh >> /var/log/redis-backup.log 2>&1"
-      (crontab -l 2>/dev/null | grep -Fq "$REDIS_BACKUP_CRON") || (
-        crontab -l 2>/dev/null
-        echo "$REDIS_BACKUP_CRON"
-      ) | crontab -
-
-    else
-      echo "You choose not to continue. Skipping backup setup."
+    read -rp "Will you be using AWS S3 directly? (yes/no): " isAwsS3
+    isAwsS3=$(echo "$isAwsS3" | tr '[:upper:]' '[:lower:]')
+    if [[ "$isAwsS3" == "no" || "$isAwsS3" == "n" ]]; then
+      read -rp "What is the S3 endpoint URL?: " AWS_ENDPOINT_URL
+      export AWS_ENDPOINT_URL="$AWS_ENDPOINT_URL"
+      update_env_file AWS_ENDPOINT_URL "$AWS_ENDPOINT_URL"
     fi
 
-    echo "Backup setup complete. Please be sure to save your .env file in a safe place in the event of a restore from backup."
+    set_aws_credentials
+
+    chmod +x "$HOME"/forwardemail.net/self-hosting/scripts/backup-mongo.sh
+    chmod +x "$HOME"/forwardemail.net/self-hosting/scripts/backup-redis.sh
+
+    MONGO_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-mongo.sh >> /var/log/mongo-backup.log 2>&1"
+    (crontab -l 2>/dev/null | grep -Fq "$MONGO_BACKUP_CRON") || (
+      crontab -l 2>/dev/null
+      echo "$MONGO_BACKUP_CRON"
+    ) | crontab -
+    REDIS_BACKUP_CRON="0 0 * * * $HOME/forwardemail.net/self-hosting/scripts/backup-redis.sh >> /var/log/redis-backup.log 2>&1"
+    (crontab -l 2>/dev/null | grep -Fq "$REDIS_BACKUP_CRON") || (
+      crontab -l 2>/dev/null
+      echo "$REDIS_BACKUP_CRON"
+    ) | crontab -
+
+    echo "✅ Backup setup complete. Please be sure to save your .env file in a safe place in the event of a restore from backup."
 
     ;;
   3)
@@ -125,13 +127,13 @@ prompt_command() {
     fi
 
     echo -e "\n========================================="
-    echo "Docker Compose Auto-Update Cron"
+    echo "Setup Auto Updates"
     echo "========================================="
-    echo "This cron will setup the following:"
-    echo "Pull the latest Docker image."
-    echo "Restart your self-hosted services using docker-compose."
-    echo "Log the output to /var/log/autoupdate.log."
-    echo "Once setup, this will run every night just after midnight (1 AM)."
+    echo "Setting up auto updates will setup a cron that will:"
+    echo "* Pull the latest Docker image."
+    echo "* Restart your self-hosted services using docker-compose."
+    echo "* Log the output to /var/log/autoupdate.log."
+    echo -e "\nOnce setup, this will run every night just after midnight (1 AM)."
     echo -e "=========================================\n"
 
     read -rp "Press Enter to continue or Ctrl+C to cancel..."
@@ -155,10 +157,10 @@ prompt_command() {
     echo "Restore from Backup"
     echo "========================================="
     echo "You are about to attempt to restore from a backup! You must:"
-    echo "- add your .env file to the /root/.env"
-    echo "- have AWS S3 compatible credentials ready"
-    echo "- have backup files in forwardemail-selfhosted bucket"
-    echo "Once complete, you should have a running email setup from last checkpoint."
+    echo "* add your .env file to the /root/.env"
+    echo "* have AWS S3 compatible credentials ready"
+    echo "* have backup files in forwardemail-selfhosted bucket"
+    echo -e "\nOnce complete, you should have a running email setup from last checkpoint."
     echo -e "=========================================\n"
 
     read -rp "Press Enter to continue or Ctrl+C to cancel..."
