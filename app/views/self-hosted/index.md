@@ -54,6 +54,8 @@ Before running the installation script, ensure you have the following:
 - **Domain Name**: A custom domain ready for DNS configuration.
 - **Clean IP**: Ensure your server has a clean IP address with no prior spam reputation by checking blacklists. More info [here](#what-tools-should-i-use-to-check-ip-reputation).
 
+> NOTE: See our list of [awesome mail server providers](https://github.com/forwardemail/awesome-mail-server-providers)
+
 #### Install
 
 Run the following command in your server to download and execute the installation script:
