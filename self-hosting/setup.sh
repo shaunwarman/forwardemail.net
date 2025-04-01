@@ -114,7 +114,9 @@ prompt_command() {
       echo "$REDIS_BACKUP_CRON"
     ) | crontab -
 
-    echo "✅ Backup setup complete. Please be sure to save your .env file in a safe place in the event of a restore from backup."
+    echo "✅ Backup setup complete!"
+    echo "You can find the crons using: \`crontab -l\`. These will run at midnight by default."
+    echo "NOTE: Please be sure to save your .env file in a safe place in the event of a restore from backup."
 
     ;;
   3)
@@ -239,10 +241,9 @@ prompt_command() {
 export_from_env_file() {
   if ! grep -q "^$1=" "$SELF_HOST_DIR/$ENV_FILE"; then
     echo "Error: The following key is missing in $SELF_HOST_DIR/$ENV_FILE: $1"
-    return 1
+  else
+    export "$1"="$(grep "^$1=" "$ENV_FILE" | cut -d'=' -f2-)"
   fi
-
-  export "$1"="$(grep "^$1=" "$ENV_FILE" | cut -d'=' -f2-)"
 }
 
 install_dependencies() {
@@ -458,7 +459,7 @@ clone_repo() {
     cd "$ROOT_DIR"
     git sparse-checkout init --cone
     git sparse-checkout set self-hosting
-    git checkout feat/self-hosted-mvp
+    git checkout main
   fi
 }
 
@@ -488,19 +489,18 @@ input_custom_domain() {
   if [[ -n "$DOMAIN" ]]; then
     echo "DOMAIN already set: $DOMAIN"
     update_env_file "DOMAIN" "$DOMAIN"
-    return 1
+  else
+    while true; do
+      read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
+      if validate_domain "$DOMAIN"; then
+        echo "✅ Domain name is valid."
+        update_env_file "DOMAIN" "$DOMAIN"
+        break
+      else
+        echo "❌ Invalid domain name. Please enter a valid one."
+      fi
+    done
   fi
-
-  while true; do
-    read -rp "Enter the domain name you are setting up (e.g. example.com): " DOMAIN </dev/tty
-    if validate_domain "$DOMAIN"; then
-      echo "✅ Domain name is valid."
-      update_env_file "DOMAIN" "$DOMAIN"
-      break
-    else
-      echo "❌ Invalid domain name. Please enter a valid one."
-    fi
-  done
 }
 
 setup_one_time_login() {
@@ -508,25 +508,24 @@ setup_one_time_login() {
     update_env_file "AUTH_BASIC_USERNAME" "$AUTH_BASIC_USERNAME"
     update_env_file "AUTH_BASIC_PASSWORD" "$AUTH_BASIC_PASSWORD"
     echo "Basic username / password already set, skipping."
-    return 1
+  else
+    PASSWORD=$(openssl rand -base64 16)
+
+    echo -e "\nTo prevent unauthorized access before setup, a temporary"
+    echo "Basic Auth gate has been enabled."
+    echo ""
+    echo "Save the following credentials for first time login:"
+    echo ""
+    echo "  🔑 Username: admin"
+    echo "  🔑 Password: $PASSWORD"
+    echo ""
+
+    read -rp "Press Enter to continue..."
+
+
+    update_env_file "AUTH_BASIC_USERNAME" "admin"
+    update_env_file "AUTH_BASIC_PASSWORD" "$PASSWORD"
   fi
-  
-  PASSWORD=$(openssl rand -base64 16)
-
-  echo -e "\nTo prevent unauthorized access before setup, a temporary"
-  echo "Basic Auth gate has been enabled."
-  echo ""
-  echo "Save the following credentials for first time login:"
-  echo ""
-  echo "  🔑 Username: admin"
-  echo "  🔑 Password: $PASSWORD"
-  echo ""
-
-  read -rp "Press Enter to continue..."
-
-
-  update_env_file "AUTH_BASIC_USERNAME" "admin"
-  update_env_file "AUTH_BASIC_PASSWORD" "$PASSWORD"
 }
 
 initial_setup() {

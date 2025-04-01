@@ -20,6 +20,7 @@ services:
       - "caldav.${DOMAIN}:127.0.0.1"
       - "imap.${DOMAIN}:127.0.0.1"
       - "smtp.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started
@@ -93,6 +94,7 @@ services:
     extra_hosts:
       - "${DOMAIN}:127.0.0.1"
       - "smtp.${DOMAIN}:127.0.0.1"
+      - "sqlite.${DOMAIN}:127.0.0.1"
     depends_on:
       mongodb:
         condition: service_started

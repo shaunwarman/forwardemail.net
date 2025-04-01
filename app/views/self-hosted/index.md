@@ -17,6 +17,7 @@
     - [Configuration](#configuration)
       - [Initial DNS setup](#initial-dns-setup)
         - [Reverse DNS / PTR record](#reverse-dns--ptr-record)
+        - [Port 25 Blocked](#port-25-blocked)
     - [Onboarding](#onboarding)
     - [Testing](#testing)
       - [Creating your first alias](#creating-your-first-alias)
@@ -33,6 +34,7 @@
       - [How do I know what is running?](#how-do-i-know-what-is-running)
       - [How do I know if something isn't running that should be?](#how-do-i-know-if-something-isnt-running-that-should-be)
       - [How do I find logs?](#how-do-i-find-logs)
+      - [Why are my outgoing emails timing out?](#why-are-my-outgoing-emails-timing-out)
       - [What tool(s) should I use to test email configuration best practices?](#what-tools-should-i-use-to-test-email-configuration-best-practices)
       - [What tool(s) should I use to check IP reputation?](#what-tools-should-i-use-to-check-ip-reputation)
 
@@ -109,7 +111,7 @@ Example:
 ```sh
 #cloud-config
 write_files:
-  - path: /root/cloudflare.ini
+  - path: /root/.cloudflare.ini
     content: |
       dns_cloudflare_api_token = "xxx"
     owner: root:root
@@ -180,6 +182,10 @@ In your DNS provider of choice, configure the appropriate DNS records. Do note a
 ##### Reverse DNS / PTR record
 
 Reverse DNS (rDNS) or reverse pointer records (PTR records) are essential for email servers because they help verify the legitimacy of the server sending the email. Each cloud provider does this differently, so you will need to lookup how to add "Reverse DNS" to map the host and IP to it's corresponding hostname. Most likely in the networking section of the provider.
+
+##### Port 25 Blocked
+
+Some ISPs and cloud providers block 25 to avoid bad actors. You may need to file a support ticket to open up port 25 for SMTP / outgoing email.
 
 ### Onboarding
 
@@ -284,6 +290,10 @@ You can run `docker ps -a` to see everything (including containers that aren't r
 You can get more logs via `docker logs -f <container_name>`. If anything exited, it's likely related to the `.env` file being configured incorrectly.
 
 Within the web UI, you can view `/admin/emails` and `/admin/logs` for outbound email logs and error logs respectively.
+
+#### Why are my outgoing emails timing out?
+
+If you see a message like Connection timed out when connecting to MX server... then you may need to check if port 25 is blocked. It is common for ISPs or cloud providers to block this by default where you may need to reach out to support / file a ticket to get this opened up.
 
 #### What tool(s) should I use to test email configuration best practices?
 
