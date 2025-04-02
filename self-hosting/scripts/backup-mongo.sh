@@ -1,4 +1,4 @@
-#!/bin/bash
+  #!/bin/bash
 
 set -e  # Exit script on any error
 
@@ -12,7 +12,7 @@ MONGO_PORT="27017"          # Default MongoDB port
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
 RETENTION_DAYS=7
 CONTAINER_BACKUP_DIR="/backups"
-BACKUP_DIR="$HOME/forwardemail.net/mongo-backups"
+BACKUP_DIR="$HOME/forwardemail.net/self-hosting/mongo-backups"
 BACKUP_NAME="mongo-backup-$TIMESTAMP"
 BACKUP_PATH="$BACKUP_DIR/$BACKUP_NAME"
 TAR_FILE="$BACKUP_DIR/$BACKUP_NAME.tgz"

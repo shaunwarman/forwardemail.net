@@ -2,7 +2,7 @@
 
 set -e  # Exit script on error
 
-BACKUP_DIR="$HOME/forwardemail.net/redis-data"
+BACKUP_DIR="$HOME/forwardemail.net/self-hosting/redis-data"
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
 BACKUP_FILE="redis-$TIMESTAMP.rdb"
 LOCAL_REDIS_DUMP="/data/dump.rdb"

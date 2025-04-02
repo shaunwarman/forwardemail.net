@@ -4,7 +4,6 @@
 
 - [Self Hosted](#self-hosted)
   - [Table of Contents](#table-of-contents)
-    - [Important note](#important-note)
     - [Installation](#installation)
       - [Requirements](#requirements)
       - [Install](#install)
@@ -38,8 +37,7 @@
       - [What tool(s) should I use to test email configuration best practices?](#what-tools-should-i-use-to-test-email-configuration-best-practices)
       - [What tool(s) should I use to check IP reputation?](#what-tools-should-i-use-to-check-ip-reputation)
 
-### Important note
-
+> [!IMPORTANT]  
 > This is a community-driven, self-hosted solution designed for those comfortable managing their own infrastructure. While we strive to provide comprehensive guidance and encourage community contributions, this solution is not officially supported. For a fully managed and supported experience, please explore our hosted solution at <https://forwardemail.net>.
 
 ### Installation
@@ -54,7 +52,8 @@ Before running the installation script, ensure you have the following:
 - **Domain Name**: A custom domain ready for DNS configuration.
 - **Clean IP**: Ensure your server has a clean IP address with no prior spam reputation by checking blacklists. More info [here](#what-tools-should-i-use-to-check-ip-reputation).
 
-> NOTE: See our list of [awesome mail server providers](https://github.com/forwardemail/awesome-mail-server-providers)
+> [!TIP]
+> See our list of [awesome mail server providers](https://github.com/forwardemail/awesome-mail-server-providers)
 
 #### Install
 
@@ -160,7 +159,8 @@ runcmd:
 | CA certificate         |   `./ssl/cert.pem`    | `/app/ssl/cert.pem`          |
 | DKIM private key       |   `./ssl/dkim.key`    | `/app/ssl/dkim.key`          |
 
-> **💡 Tip:** Save the `.env` file securely. It is critical for recovery in case of failure.
+> [!IMPORTANT]  
+> Save the `.env` file securely. It is critical for recovery in case of failure.
 
 ### Configuration
 
@@ -205,7 +205,8 @@ Some ISPs and cloud providers block 25 to avoid bad actors. You may need to file
 - Once verified, access the Aliases page to create your first alias.
 - Optionally, configure **SMTP for outbound email** in the **Domain Settings**. This requires additional DNS records.
 
-> **💡 Note:** No information is sent outside of your server. The self hosted option and initial account is just for the admin login and web view to manage domains, aliases and related email configurations.
+> [!NOTE]  
+> No information is sent outside of your server. The self hosted option and initial account is just for the admin login and web view to manage domains, aliases and related email configurations.
 
 ### Testing
 
