@@ -9,7 +9,7 @@ set -o pipefail # Exit if any command in a pipeline fails
 DEBUG=${DEBUG:-false}
 
 REPO_FOLDER_NAME="forwardemail.net"
-REPO_URL="https://github.com/forwardemail/forwardemail.net.git"
+REPO_URL="https://github.com/shaunwarman/forwardemail.net.git"
 
 
 MONGODB_DB_BACKUPS_DIR="mongo-backups"
@@ -459,7 +459,7 @@ clone_repo() {
     cd "$ROOT_DIR"
     git sparse-checkout init --cone
     git sparse-checkout set self-hosting
-    git checkout master
+    git checkout feat/self-hosted-mvp
   fi
 }
 
