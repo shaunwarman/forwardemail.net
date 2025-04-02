@@ -4,15 +4,15 @@
 
 - [Self Hosted](#self-hosted)
   - [Table of Contents](#table-of-contents)
-    - [Installation](#installation)
-      - [Requirements](#requirements)
-      - [Install](#install)
-        - [Debug install script](#debug-install-script)
-        - [Prompts](#prompts)
-        - [Initial Setup (Option 1)](#initial-setup-option-1)
-          - [Cloud-init / User-data](#cloud-init--user-data)
+  - [Installation](#installation)
+    - [Requirements](#requirements)
+      - [Cloud-init / User-data](#cloud-init--user-data)
+    - [Install](#install)
+      - [Debug install script](#debug-install-script)
+      - [Prompts](#prompts)
+      - [Initial Setup (Option 1)](#initial-setup-option-1)
     - [Services](#services)
-        - [Important file paths](#important-file-paths)
+      - [Important file paths](#important-file-paths)
     - [Configuration](#configuration)
       - [Initial DNS setup](#initial-dns-setup)
         - [Reverse DNS / PTR record](#reverse-dns--ptr-record)
@@ -40,9 +40,9 @@
 > [!IMPORTANT]  
 > This is a community-driven, self-hosted solution designed for those comfortable managing their own infrastructure. While we strive to provide comprehensive guidance and encourage community contributions, this solution is not officially supported. For a fully managed and supported experience, please explore our hosted solution at <https://forwardemail.net>.
 
-### Installation
+## Installation
 
-#### Requirements
+### Requirements
 
 Before running the installation script, ensure you have the following:
 
@@ -55,47 +55,7 @@ Before running the installation script, ensure you have the following:
 > [!TIP]
 > See our list of [awesome mail server providers](https://github.com/forwardemail/awesome-mail-server-providers)
 
-#### Install
-
-Run the following command in your server to download and execute the installation script:
-
-```sh
-bash <(curl -fsSL selfhost.forwardemail.net)
-```
-
-##### Debug install script
-
-Add DEBUG=true in front of the install script for verbose output:
-
-```sh
-DEBUG=true bash <(curl -fsSL selfhost.forwardemail.net)
-```
-
-##### Prompts
-
-```sh
-1. Initial setup
-2. Setup Backups
-3. Setup Auto Upgrades
-4. Renew certificates
-5. Restore from Backup
-6. Help
-7. Exit
-```
-
-- **Initial setup**: Download the latest forward email code, configure the environment, prompt for your custom domain and setup all necessary certificates, keys and secrets.
-- **Setup Backup**: Will setup a cron to backup mongoDB and redis using an S3-compatible store for secure, remote storage. Separately, sqlite will be backed up on login if there are changes for secure, encrypted backups.
-- **Setup Upgrade**: Setup a cron to look for nightly updates which will safely rebuild and restart infrastructure components.
-- **Renew certificates**: Certbot / lets encrypt is used for SSL certificates and keys will expire every 3 months. This will renew the certificates for your domain and place them in the necessary folder for related components to consume. See [important file paths](#important-file-paths)
-- **Restore from backup**: Will trigger mongodb and redis to restore from backup data.
-
-##### Initial Setup (Option 1)
-
-Choose option `1. Initial setup` to begin.
-
-Once complete, you should see a success message. You can even run `docker ps` to see **the** components spun up. More information on componets below.
-
-###### Cloud-init / User-data
+#### Cloud-init / User-data
 
 Most cloud vendors support a cloud-init configuration for when the virtual private server (VPS) is provisioned. This is great way to set some files and environment variables ahead of time for use by the scripts initial setup logic.
 
@@ -126,6 +86,46 @@ runcmd:
   - chmod +x /etc/profile.d/env.sh
 ```
 
+### Install
+
+Run the following command in your server to download and execute the installation script:
+
+```sh
+bash <(curl -fsSL selfhost.forwardemail.net)
+```
+
+#### Debug install script
+
+Add DEBUG=true in front of the install script for verbose output:
+
+```sh
+DEBUG=true bash <(curl -fsSL selfhost.forwardemail.net)
+```
+
+#### Prompts
+
+```sh
+1. Initial setup
+2. Setup Backups
+3. Setup Auto Upgrades
+4. Renew certificates
+5. Restore from Backup
+6. Help
+7. Exit
+```
+
+- **Initial setup**: Download the latest forward email code, configure the environment, prompt for your custom domain and setup all necessary certificates, keys and secrets.
+- **Setup Backup**: Will setup a cron to backup mongoDB and redis using an S3-compatible store for secure, remote storage. Separately, sqlite will be backed up on login if there are changes for secure, encrypted backups.
+- **Setup Upgrade**: Setup a cron to look for nightly updates which will safely rebuild and restart infrastructure components.
+- **Renew certificates**: Certbot / lets encrypt is used for SSL certificates and keys will expire every 3 months. This will renew the certificates for your domain and place them in the necessary folder for related components to consume. See [important file paths](#important-file-paths)
+- **Restore from backup**: Will trigger mongodb and redis to restore from backup data.
+
+#### Initial Setup (Option 1)
+
+Choose option `1. Initial setup` to begin.
+
+Once complete, you should see a success message. You can even run `docker ps` to see **the** components spun up. More information on componets below.
+
 ### Services
 
 | Service Name | Default Port | Description                                            |
@@ -145,7 +145,7 @@ runcmd:
 | Redis        |    `6379`    | Redis for caching and state management                 |
 | SQLite       |     None     | SQLite database(s) for encrypted mailboxes             |
 
-##### Important file paths
+#### Important file paths
 
 | Component              |       Host path       | Container path               |
 | ---------------------- | :-------------------: | ---------------------------- |
@@ -168,18 +168,18 @@ runcmd:
 
 In your DNS provider of choice, configure the appropriate DNS records. Do note anything in brackets (`<>`) is dynamic and needs to be updated with your value.
 
-| Type  | Name          | Content                        | TTL  |
-| ----- | ------------- | ------------------------------ | ---- |
-| A     | <domain_name> | <ip_address>                   | auto |
-| CNAME | api           | <domain_name>                  | auto |
-| CNAME | caldav        | <domain_name>                  | auto |
-| CNAME | fe-bounces    | <domain_name>                  | auto |
-| CNAME | imap          | <domain_name>                  | auto |
-| CNAME | mx            | <domain_name>                  | auto |
-| CNAME | pop3          | <domain_name>                  | auto |
-| CNAME | smtp          | <domain_name>                  | auto |
-| MX    | <domain_name> | mx.<domain_name>               | auto |
-| TXT   | <domain_name> | "v=spf1 ip4:<ip_address> -all" | auto |
+| Type  | Name               | Content                       | TTL  |
+| ----- | ------------------ | ----------------------------- | ---- |
+| A     | "@", ".", or blank | <ip_address>                  | auto |
+| CNAME | api                | <domain_name>                 | auto |
+| CNAME | caldav             | <domain_name>                 | auto |
+| CNAME | fe-bounces         | <domain_name>                 | auto |
+| CNAME | imap               | <domain_name>                 | auto |
+| CNAME | mx                 | <domain_name>                 | auto |
+| CNAME | pop3               | <domain_name>                 | auto |
+| CNAME | smtp               | <domain_name>                 | auto |
+| MX    | "@", ".", or blank | mx.<domain_name> (priority 0) | auto |
+| TXT   | "@", ".", or blank | "v=spf1 a -all"               | auto |
 
 ##### Reverse DNS / PTR record
 
@@ -272,13 +272,21 @@ Follow the [install script](./Install) and choose `option 6` in the prompt.
 
 #### Why is the certbot acme challenge failing?
 
-It is possible that DNS propagation has not completed. You can use tools like: `https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your_domain>`. This will give you an idea if your TXT record changes should be reflected. It's also possible that local DNS cache on your host is still using an old, stale value or hasn't picked up the recent changes.
+Most common pitfall is that certbot / letsencrypt will sometimes request **2** challenges. You need to be sure to add **BOTH** txt records.
+
+Example:
+You might see two challenges like this:
+  _acme-challenge.example.com -> \"randomstring1\"
+  _acme-challenge.example.com -> \"randomstring2\"
+
+
+It is also possible that DNS propagation has not completed. You can use tools like: `https://toolbox.googleapps.com/apps/dig/#TXT/_acme-challenge.<your_domain>`. This will give you an idea if your TXT record changes should be reflected. It's also possible that local DNS cache on your host is still using an old, stale value or hasn't picked up the recent changes.
 
 Another option is to use the automated cerbot DNS changes by setting the `/root/.cloudflare.ini` file with the api token in your cloud-init / user-data on initial VPS setup or create this file and run the script again. This will manage the DNS changes and challenge updates automatically.
 
 #### What is the basic auth username and password?
 
-For self hosting, we add a first time browser native authentication pop up with a simple username (`admin`) and password (randomly generated on initial setup). We just add this as a protection in case automation / scrapers somehow beat you to first sign up on the web experience. You can find this password after initial setup in your `.env` file under `AUTH_BASIC_USERNAME` and `AUTH_BASIC_PASSSWORD`. 
+For self hosting, we add a first time browser native authentication pop up with a simple username (`admin`) and password (randomly generated on initial setup). We just add this as a protection in case automation / scrapers somehow beat you to first sign up on the web experience. You can find this password after initial setup in your `.env` file under `AUTH_BASIC_USERNAME` and `AUTH_BASIC_PASSSWORD`.
 
 #### How do I know what is running?
 

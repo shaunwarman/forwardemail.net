@@ -257,13 +257,11 @@ install_dependencies() {
     gnupg \
     git \
     openssl \
-    certbot \
-    docker-compose \
-    python3-certbot-dns-cloudflare
+    docker-compose
 
   # ubuntu 24 doesn't have awscli
   # https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
-  snap install aws-cli --classic
+  snap install aws-cli certbot --classic
 
   # Add Docker’s official GPG key
   install -m 0755 -d /etc/apt/keyrings
@@ -554,6 +552,26 @@ initial_setup() {
   setup_one_time_login
 
   echo "Generating SSL certificates for *.$DOMAIN"
+
+  if [[ ! -f "/root/.cloudflare.ini" ]]; then
+    echo "
+IMPORTANT: When generating SSL certificates with Certbot using DNS challenges,
+you may be prompted to create MULTIPLE TXT records with the SAME name.
+This typically happens when requesting wildcard certificates or multiple domains.
+
+Example:
+You might see two challenges like this:
+  _acme-challenge.example.com -> \"randomstring1\"
+  _acme-challenge.example.com -> \"randomstring2\"
+
+Do NOT remove or replace the first TXT record when adding the second one.
+Both TXT records must exist simultaneously for the verification to succeed.
+
+Double-check that your DNS settings contain BOTH records before proceeding!
+"
+    read -rp "Press Enter to continue or Ctrl+C to cancel..."
+  fi
+
   run_silent generate_certificates
 
   echo "Generating encryption keys..."
@@ -575,7 +593,7 @@ initial_setup() {
 
   echo "✅ Setup completed successfully!"
 
-  echo -e "\nContinue with the rest of the self hosted guide: https://forwardemail.net/self-hosted..."
+  echo -e "\nContinue with the rest of the self hosted guide: https://forwardemail.net/self-hosted#configuration"
 }
 
 # Check if the operating system is Ubuntu

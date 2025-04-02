@@ -1,13 +1,7 @@
-  #!/bin/bash
+#!/bin/bash
 
 set -e  # Exit script on any error
 
-# Configuration
-MONGO_HOST="localhost"      # Change if MongoDB is on a different host
-MONGO_PORT="27017"          # Default MongoDB port
-# MONGO_USER="your_user"    # If authentication is enabled
-# MONGO_PASS="your_password"
-# MONGO_DB="your_database"
 
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
 RETENTION_DAYS=7
