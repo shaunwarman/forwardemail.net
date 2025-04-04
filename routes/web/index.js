@@ -10,7 +10,6 @@ const { setTimeout } = require('node:timers/promises');
 const Boom = require('@hapi/boom');
 const Router = require('@koa/router');
 const _ = require('lodash');
-const basicAuth = require('basic-auth');
 const dashify = require('dashify');
 const dayjs = require('dayjs-with-plugins');
 const isSANB = require('is-string-and-not-blank');
@@ -198,24 +197,6 @@ router
   });
 
 const localeRouter = new Router({ prefix: '/:locale' });
-
-if (config.isSelfHosted) {
-  localeRouter.use((ctx, next) => {
-    const credentials = basicAuth(ctx.req);
-    if (
-      !credentials ||
-      credentials.name !== process.env.AUTH_BASIC_USERNAME ||
-      credentials.pass !== process.env.AUTH_BASIC_PASSWORD
-    ) {
-      ctx.status = 401;
-      ctx.set('WWW-Authenticate', 'Basic realm="Secure Area"');
-      ctx.body = 'Access denied';
-      return;
-    }
-
-    return next();
-  });
-}
 
 localeRouter
   // add HTTP Link header to GET requests
